@@ -13,8 +13,10 @@ if (!$d) { not_found(); }
 if (!can_view_defect($user, $d)) { forbidden(); }
 
 $isAdmin = $role === 'admin';
-$isDev = $role === 'developer';            // can_view_defect garante: é o responsável e o chamado está com ele
-$canComment = $role !== 'viewer';
+$isDev = $role === 'developer';
+// Desenvolvedor só age enquanto o chamado está com ele (aberto/em andamento). Concluído = somente leitura.
+$devReadOnly = $isDev && !dev_can_act($user, $d);
+$canComment = $role !== 'viewer' && !$devReadOnly;
 
 // Status que o desenvolvedor pode escolher (sem "Reaberto"); "Concluído" devolve o chamado ao Admin
 const DEV_STATUS_CHOICES = ['open' => 'Aberto', 'fixing' => 'Em andamento', 'fixed' => 'Concluído (devolve o chamado ao Admin)'];
@@ -42,6 +44,11 @@ if (is_post()) {
         redirect('defect_view.php?id=' . $id);
     }
 
+    if ($devReadOnly) {
+        flash('error', 'Este chamado já foi concluído: ele fica em Concluído, somente leitura.');
+        redirect('defect_view.php?id=' . $id);
+    }
+
     /* ---- Comentário + fotos (+ status, no caso do desenvolvedor) ---- */
     if ($action === 'update' && $canComment) {
         $comment = post('comment');
@@ -66,8 +73,8 @@ if (is_post()) {
         foreach ($uploadErrors as $m) { flash('warn', $m); }
 
         if ($statusChanged && $newStatus === 'fixed') {
-            flash('success', 'Chamado #' . $id . ' concluído e devolvido ao Administrador.');
-            redirect('dev_board.php');      // o dev já não tem mais acesso a este chamado
+            flash('success', 'Chamado #' . $id . ' concluído e devolvido ao Administrador. Ele fica na coluna Concluído, somente leitura.');
+            redirect('dev_board.php');
         }
         flash('success', $statusChanged ? 'Status atualizado para ' . DEFECT_STATUS[$newStatus] . '.' : 'Registro adicionado.');
         redirect('defect_view.php?id=' . $id);
@@ -174,6 +181,10 @@ include __DIR__ . '/includes/header.php';
 </div>
 <?php endif; ?>
 
+<?php if ($devReadOnly): ?>
+<div class="alert alert-info">Você concluiu este chamado. Ele está na coluna <strong>Concluído</strong> do seu Kanban, <strong>somente leitura</strong>
+    — a situação atual (<?= defect_badge($d['status']) ?>) é conduzida pelo Administrador.</div>
+<?php endif; ?>
 <?php if ($canComment && $d['status'] !== 'closed'): ?>
 <form method="post" enctype="multipart/form-data" class="card">
     <?= csrf_field() ?><input type="hidden" name="action" value="update">
@@ -182,7 +193,7 @@ include __DIR__ . '/includes/header.php';
         <?php if ($isDev): ?>
         <label class="field" style="max-width:380px">Status
             <select name="status"><?= options(DEV_STATUS_CHOICES, $d['status']) ?></select>
-            <small>Ao concluir, você deixa de ter acesso ao chamado e ele volta para o Administrador.</small>
+            <small>Ao concluir, o chamado volta para o Administrador e fica na coluna Concluído, somente leitura (você não poderá mais alterá-lo).</small>
         </label>
         <?php endif; ?>
         <label class="field">Comentário

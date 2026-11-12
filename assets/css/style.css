@@ -283,7 +283,11 @@ body.kb .topbar h1, body.kb .menu-toggle { color: #fff; }
 .kb-btn { display: inline-block; background: var(--lvl-high); color: #fff; border: 1px solid #e0202f; border-radius: 8px; padding: 5px 12px; font: inherit; font-size: .8rem; font-weight: 600; cursor: pointer; text-decoration: none; }
 .kb-btn:hover { background: var(--lvl-crit); text-decoration: none; }
 .kb-btn-ghost { background: transparent; color: #fca5a5; border-color: #5c121a; }
-.kb-board.js .kb-btn-ghost { display: none; }
+.kb-board.js .move-form .kb-btn-ghost { display: none; }
+.kb-btn-ghost.kb-comment { display: inline-block; }
+.kb-card.locked { cursor: default; opacity: .72; border-left-color: #52525b; box-shadow: none; }
+.kb-card.locked:hover { transform: none; }
+.kb-lock { font-size: .72rem; color: var(--kb-mute); margin: 0 0 8px; }
 
 .kb-toast { position: fixed; right: 20px; bottom: 20px; max-width: min(460px, calc(100vw - 40px)); padding: 14px 18px; border-radius: 10px; z-index: 50; font-size: .92rem; box-shadow: 0 10px 30px rgba(0, 0, 0, .7); }
 .kb-toast[hidden] { display: none; }

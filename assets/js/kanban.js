@@ -38,10 +38,28 @@
         return board.querySelector('.kb-col[data-status="' + status + '"] [data-list]');
     }
 
+    // Trava o cartão (chamado concluído pelo dev): continua na coluna, mas sem arrastar nem mover
+    function lock(card) {
+        card.classList.add('locked');
+        card.setAttribute('draggable', 'false');
+        var form = card.querySelector('.move-form');
+        if (form) { form.remove(); }
+        if (!card.querySelector('[data-lock]')) {
+            var p = document.createElement('p');
+            p.className = 'kb-lock';
+            p.setAttribute('data-lock', '');
+            p.textContent = 'Concluído · somente leitura';
+            var meta = card.querySelector('.kb-meta');
+            if (meta) { meta.parentNode.insertBefore(p, meta.nextSibling); }
+        }
+        var open = card.querySelector('.kb-actions .kb-btn');
+        if (open) { open.textContent = 'Ver chamado'; open.classList.add('kb-btn-ghost', 'kb-comment'); }
+    }
+
     // Move visualmente, grava no servidor e desfaz se o servidor recusar
     function move(card, to) {
         var from = card.dataset.status;
-        if (from === to) { return; }
+        if (from === to || card.classList.contains('locked')) { return; }
         var originList = card.parentNode;
         var originNext = card.nextSibling;
         place(card, listOf(to));
@@ -60,9 +78,16 @@
                 var sel = card.querySelector('select[name="status"]');
                 if (res.ok) {
                     if (sel) { sel.value = to; }
-                    // Chamado concluído pelo dev: sai do quadro (foi devolvido ao Admin e o dev perde o acesso)
-                    if (res.removed) { card.remove(); refresh(); }
+                    // Chamado concluído pelo dev: permanece em Concluído, porém travado (somente leitura)
+                    if (res.locked) { lock(card); }
                     showToast(res.message, true);
+                } else if (res.locked) {
+                    // O servidor informa que o chamado já está concluído: garante que ele fique travado em Concluído
+                    place(card, listOf('fixed'));
+                    card.dataset.status = 'fixed';
+                    lock(card);
+                    refresh();
+                    showToast(res.message, false);
                 } else if (res.removed) {
                     // O chamado já não está com este usuário: tira do quadro
                     card.remove();
@@ -92,6 +117,7 @@
     board.addEventListener('dragstart', function (ev) {
         var card = ev.target.closest && ev.target.closest('.kb-card');
         if (!card) { return; }
+        if (card.classList.contains('locked')) { ev.preventDefault(); return; }
         dragged = card;
         card.classList.add('dragging');
         ev.dataTransfer.effectAllowed = 'move';

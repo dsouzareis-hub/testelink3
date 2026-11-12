@@ -12,8 +12,10 @@ $fSeverity = $_GET['severity'] ?? '';
 $where = ['1=1'];
 $params = [];
 if ($role === 'developer') {
-    // Só o que está com ele; depois de concluir, o chamado volta ao Admin e some daqui
-    $where[] = "d.assigned_to = ? AND d.status IN ('open','fixing')"; $params[] = $uid;
+    // O que está com ele e o que ele já concluiu (somente leitura)
+    $where[] = "((d.assigned_to = ? AND d.status IN ('open','fixing'))
+                 OR EXISTS (SELECT 1 FROM defect_comments c WHERE c.defect_id = d.id AND c.user_id = ? AND c.new_status = 'fixed'))";
+    array_push($params, $uid, $uid);
 } elseif ($role === 'tester') {
     $where[] = '(d.reported_by = ? OR d.case_id IN (SELECT case_id FROM assignments WHERE tester_id = ?))';
     array_push($params, $uid, $uid);

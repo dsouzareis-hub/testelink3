@@ -61,7 +61,7 @@ testlink/
 |---|---|
 | **Administrador** | CRUD de usuários, projetos, suítes e casos; atribuir casos a testers; **encaminhar chamados ao desenvolvedor** (só urgência + desenvolvedor); relatórios; configurações |
 | **Tester** | Ver casos atribuídos (Kanban), executar (Aprovado/Reprovado/Bloqueado), assentamento, múltiplas evidências, reteste, histórico próprio. **Não encaminha ao desenvolvedor** |
-| **Desenvolvedor** | Kanban "Meus Chamados" com os chamados encaminhados a ele; status Aberto / Em andamento / Concluído; comentário de retorno **e fotos**. Ao concluir, perde o acesso e o chamado volta ao Admin |
+| **Desenvolvedor** | Kanban "Meus Chamados" com os chamados encaminhados a ele; status Aberto / Em andamento / Concluído; comentário de retorno **e fotos**. Ao concluir, o chamado volta ao Admin e **permanece na coluna Concluído, somente leitura** (não dá mais para mover, comentar ou alterar) |
 | **Usuário (leitura)** | Ver dashboard, casos, execuções, defeitos e relatórios — sem editar nada |
 
 ## Fluxo principal
@@ -73,7 +73,7 @@ testlink/
 5. **Tomada de Decisão (Admin)**: o Admin abre o chamado, ajusta a **urgência** e escolhe **um** destino (sem campo de comentário):
    - **Desenvolvedor** → status *Aberto*; ou
    - **Tester — Reteste** → o caso volta ao Kanban do tester como **Reteste** (já possível na triagem, sem passar pelo dev).
-6. O **Desenvolvedor** vê o chamado no seu Kanban, trabalha (Aberto ⇄ Em andamento), comenta e anexa fotos, e **conclui**. Ao concluir ele perde o acesso e o chamado volta ao Admin (*Concluído pelo Dev*), que toma uma **nova decisão**: de novo ao dev ou ao tester para reteste.
+6. O **Desenvolvedor** vê o chamado no seu Kanban, trabalha (Aberto ⇄ Em andamento), comenta e anexa fotos, e **conclui**. Ao concluir, o chamado volta ao Admin (*Concluído pelo Dev*) e fica no quadro do dev na coluna Concluído, só para consulta (mostra a situação atual). O Admin toma uma **nova decisão**: de novo ao dev (o cartão volta a ficar ativo em Aberto) ou ao tester para reteste.
 7. **Reteste** (tester escolhido pelo Admin): aprovado → chamado **Fechado**; reprovado → **Reaberto** (volta ao Admin para nova decisão).
 8. Admin/usuário de leitura gera e imprime os relatórios.
 
@@ -94,12 +94,15 @@ A tela Meus Testes é um quadro Kanban escuro (preto/grafite com vermelho) com a
 
 - **Arrastar e soltar** os cartões entre colunas; o status é gravado na hora. Cada cartão também tem o seletor *Mover para* (teclado/toque/sem JavaScript).
 - **Aguardando → Em Andamento**: livre. Registrar uma execução também move o cartão para Em Andamento.
-- **→ Concluído**: bloqueado enquanto não houver **assentamento** *e* **ao menos uma foto de evidência** na execução do ciclo atual.
+- **Aprovado + comentário (assentamento)**: ao salvar a execução, o cartão **vai sozinho para Concluído** e fica visível ali. A foto é opcional nesse caso. Aprovado sem comentário fica em Em Andamento e avisa o que falta; adicionar um comentário depois conclui o cartão.
+- **Comentários depois de concluído**: na tela da execução (botão *Comentar* no cartão) o tester continua adicionando comentários e fotos normalmente.
+- **Reprovado ou Bloqueado**: o cartão fica em Em Andamento. Para concluir (arrastando ou pelo seletor) é preciso **assentamento** *e* **ao menos uma foto de evidência**. Reexecutar um cartão concluído como Reprovado tira-o de Concluído.
+- **→ Concluído** (qualquer forma): a regra acima é validada no servidor.
   A mensagem diz o que falta. A regra é aplicada no servidor (`includes/kanban.php`), valendo para arrastar, seletor ou POST direto.
 - Quando um defeito do caso é marcado como **Corrigido**, o cartão volta para Aguardando (reteste) e começa um novo ciclo.
 - **Criticidade** (prioridade do caso) em etiquetas vermelhas de intensidade crescente: Baixo < Médio < Alto < Crítico (o mais vibrante, com brilho).
 
-> Já instalou antes? Execute uma vez, nesta ordem, `migration_registro.sql`, `migration_kanban.sql`, `migration_fluxo.sql` e `migration_decisao.sql` no banco `testlink3` (nenhuma apaga dados).
+> Já instalou antes? Execute uma vez, nesta ordem, `migration_registro.sql`, `migration_kanban.sql`, `migration_fluxo.sql`, `migration_decisao.sql` e `migration_comentarios.sql` no banco `testlink3` (nenhuma apaga dados).
 > Para rodar testes sem tocar no seu banco, aponte para outro com a variável de ambiente `TESTLINK_DB`.
 
 ## Relatórios

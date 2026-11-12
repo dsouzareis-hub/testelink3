@@ -123,6 +123,19 @@ function set_defect_status(int $defectId, string $new, int $userId, ?string $com
     return add_defect_comment($defectId, $userId, $comment, $old !== $new ? $old : null, $old !== $new ? $new : null);
 }
 
+/** Este desenvolvedor já concluiu este chamado em algum momento? (o chamado fica na coluna Concluído dele, só leitura) */
+function dev_concluded(int $devId, int $defectId): bool
+{
+    return (bool)q("SELECT 1 FROM defect_comments WHERE defect_id = ? AND user_id = ? AND new_status = 'fixed' LIMIT 1", [$defectId, $devId])->fetchColumn();
+}
+
+/** O chamado está com este desenvolvedor para trabalho (aberto/em andamento)? Só então ele pode agir. */
+function dev_can_act(array $user, array $defect): bool
+{
+    return $user['role'] === 'developer' && (int)$defect['assigned_to'] === (int)$user['id']
+        && in_array($defect['status'], DEV_ACTIVE_STATUS, true);
+}
+
 /** O usuário pode ver este defeito? */
 function can_view_defect(array $user, array $defect): bool
 {
@@ -131,8 +144,8 @@ function can_view_defect(array $user, array $defect): bool
         case 'viewer':
             return true;
         case 'developer':
-            // O desenvolvedor só enxerga enquanto o chamado está com ele; ao concluir, perde o acesso
-            return (int)$defect['assigned_to'] === (int)$user['id'] && in_array($defect['status'], DEV_ACTIVE_STATUS, true);
+            // Vê o que está com ele (para agir) e o que ele já concluiu (somente leitura)
+            return dev_can_act($user, $defect) || dev_concluded((int)$user['id'], (int)$defect['id']);
         case 'tester':
             return (int)$defect['reported_by'] === (int)$user['id'] || tester_has_case($user['id'], (int)$defect['case_id']);
     }

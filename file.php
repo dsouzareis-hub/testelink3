@@ -20,7 +20,7 @@ if (isset($_GET['logo'])) {
 
 // Foto anexada a um comentário de defeito: mesma regra de visibilidade do defeito
 if (isset($_GET['att'])) {
-    $att = q('SELECT da.stored_name, da.mime, d.assigned_to, d.status, d.reported_by, d.case_id
+    $att = q('SELECT da.stored_name, da.mime, d.id, d.assigned_to, d.status, d.reported_by, d.case_id
               FROM defect_attachments da JOIN defects d ON d.id = da.defect_id WHERE da.id = ?', [get_int('att')])->fetch();
     $path = $att ? UPLOAD_DIR . basename($att['stored_name']) : '';
     if (!$att || !can_view_defect($user, $att) || !is_file($path) || !isset(ALLOWED_IMAGE_TYPES[$att['mime']])) {
@@ -49,8 +49,10 @@ if ($ev) {
             $allowed = (int)$ev['tester_id'] === $uid || tester_has_case($uid, (int)$ev['case_id']);
             break;
         case 'developer':
-            // Só enquanto o chamado está com ele (aberto/em andamento)
-            $allowed = (bool)q("SELECT 1 FROM defects WHERE execution_id = ? AND assigned_to = ? AND status IN ('open','fixing')", [$ev['exec_id'], $uid])->fetchColumn();
+            // Chamado com ele (aberto/em andamento) ou que ele já concluiu (somente leitura)
+            $allowed = (bool)q("SELECT 1 FROM defects d WHERE d.execution_id = ? AND ((d.assigned_to = ? AND d.status IN ('open','fixing'))
+                                OR EXISTS (SELECT 1 FROM defect_comments c WHERE c.defect_id = d.id AND c.user_id = ? AND c.new_status = 'fixed'))",
+                [$ev['exec_id'], $uid, $uid])->fetchColumn();
             break;
     }
 }

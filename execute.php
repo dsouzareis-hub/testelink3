@@ -1,5 +1,6 @@
 <?php
 require __DIR__ . '/includes/bootstrap.php';
+require __DIR__ . '/includes/kanban.php';
 $user = require_role('tester');
 $uid = (int)$user['id'];
 
@@ -39,8 +40,6 @@ if (is_post()) {
             q('INSERT INTO executions (case_id, tester_id, result, notes, case_version) VALUES (?,?,?,?,?)',
                 [$caseId, $uid, $result, $notes ?: null, $case['version']]);
             $execId = (int)$pdo->lastInsertId();
-            // Ao registrar uma execução, o cartão do Kanban sai de "Aguardando" para "Em Andamento"
-            q("UPDATE assignments SET kanban_status = 'doing' WHERE case_id = ? AND tester_id = ? AND kanban_status = 'waiting'", [$caseId, $uid]);
 
             // Reprovado: abre o chamado "Aguardando triagem". O tester NÃO escolhe o desenvolvedor — o Admin encaminha.
             $defectNew = null;
@@ -66,8 +65,11 @@ if (is_post()) {
     if (!$error) {
         [$saved, $uploadErrors] = save_evidences($execId);
         foreach ($uploadErrors as $m) { flash('warn', $m); }
+        // Ajusta o Kanban já com as fotos salvas: Aprovado + comentário vai direto para Concluído
+        $kanbanMsg = kanban_after_execution($caseId, $uid, $result);
         flash('success', 'Execução registrada' . ($saved ? " com $saved evidência(s)" : '') . '.'
-            . ($defectNew ? " Chamado #$defectNew aberto: o Administrador fará o encaminhamento ao desenvolvedor." : ''));
+            . ($defectNew ? " Chamado #$defectNew aberto: o Administrador fará o encaminhamento ao desenvolvedor." : '')
+            . ($kanbanMsg ? ' ' . $kanbanMsg : ''));
         redirect('execution_view.php?id=' . $execId);
     }
     flash('error', $error);

@@ -115,6 +115,17 @@ CREATE TABLE executions (
     FOREIGN KEY (tester_id) REFERENCES users(id)      ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+-- Comentários adicionados depois do registro da execução (o assentamento original fica em executions.notes)
+CREATE TABLE execution_comments (
+    id           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    execution_id INT UNSIGNED NOT NULL,
+    user_id      INT UNSIGNED NOT NULL,
+    comment      TEXT NOT NULL,
+    created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (execution_id) REFERENCES executions(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id)      REFERENCES users(id)      ON DELETE CASCADE
+) ENGINE=InnoDB;
+
 CREATE TABLE evidences (
     id           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     execution_id INT UNSIGNED NOT NULL,

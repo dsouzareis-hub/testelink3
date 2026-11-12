@@ -16,14 +16,18 @@ const DEV_COLUMNS = ['open' => 'Aberto', 'fixing' => 'Em Andamento', 'fixed' => 
 
 /**
  * Move um chamado no Kanban do desenvolvedor.
- * Aberto ⇄ Em Andamento é livre. Concluído devolve o chamado ao Admin: o dev perde o acesso (o cartão some do quadro).
- * Retorna ['ok', 'message', 'status', 'removed'?].
+ * Aberto ⇄ Em Andamento é livre. Concluído devolve o chamado ao Admin e o cartão PERMANECE na coluna Concluído,
+ * porém travado: o dev não pode mais mover, comentar nem alterar nada.
+ * Retorna ['ok', 'message', 'status', 'locked'?, 'removed'?].
  */
 function dev_move(int $defectId, string $to, int $devId): array
 {
     $d = q("SELECT id, status FROM defects WHERE id = ? AND assigned_to = ? AND status IN ('open','fixing')", [$defectId, $devId])->fetch();
     if (!$d) {
-        return ['ok' => false, 'message' => 'Chamado não encontrado ou já devolvido ao Administrador. Recarregue a página.', 'status' => '', 'removed' => true];
+        if (dev_concluded($devId, $defectId)) {
+            return ['ok' => false, 'message' => 'Este chamado já foi concluído: fica na coluna Concluído, somente leitura.', 'status' => 'fixed', 'locked' => true];
+        }
+        return ['ok' => false, 'message' => 'Chamado não encontrado. Recarregue a página.', 'status' => '', 'removed' => true];
     }
     if (!isset(DEV_COLUMNS[$to])) {
         return ['ok' => false, 'message' => 'Status inválido.', 'status' => $d['status']];
@@ -33,7 +37,7 @@ function dev_move(int $defectId, string $to, int $devId): array
     }
     if ($to === 'fixed') {
         set_defect_status($defectId, 'fixed', $devId, 'Concluído pelo desenvolvedor; chamado devolvido ao Administrador.');
-        return ['ok' => true, 'message' => 'Chamado #' . $defectId . ' concluído e devolvido ao Administrador.', 'status' => 'fixed', 'removed' => true];
+        return ['ok' => true, 'message' => 'Chamado #' . $defectId . ' concluído e devolvido ao Administrador. Ele fica em Concluído, somente leitura.', 'status' => 'fixed', 'locked' => true];
     }
     set_defect_status($defectId, $to, $devId);
     return ['ok' => true, 'message' => 'Movido para ' . DEV_COLUMNS[$to] . '.', 'status' => $to];
@@ -41,12 +45,15 @@ function dev_move(int $defectId, string $to, int $devId): array
 
 /**
  * O que falta para concluir? Considera a última execução deste tester, neste caso, dentro do ciclo atual.
- * Exige: assentamento preenchido E ao menos uma foto de evidência.
+ * - Assentamento: observações da execução OU algum comentário adicionado depois.
+ * - Foto de evidência: obrigatória, exceto quando o resultado é Aprovado (Aprovado + comentário já conclui).
  * Retorna lista de pendências (vazia = pode concluir).
  */
 function kanban_missing(array $assignment): array
 {
-    $ex = q('SELECT ex.id, ex.notes, (SELECT COUNT(*) FROM evidences WHERE execution_id = ex.id) evs
+    $ex = q('SELECT ex.id, ex.notes, ex.result,
+                    (SELECT COUNT(*) FROM evidences WHERE execution_id = ex.id) evs,
+                    (SELECT COUNT(*) FROM execution_comments WHERE execution_id = ex.id AND comment <> \'\') cmts
              FROM executions ex WHERE ex.case_id = ? AND ex.tester_id = ? AND ex.executed_at >= ?
              ORDER BY ex.id DESC LIMIT 1',
         [$assignment['case_id'], $assignment['tester_id'], $assignment['cycle_start']])->fetch();
@@ -55,13 +62,45 @@ function kanban_missing(array $assignment): array
         return ['a execução do teste (resultado, assentamento e foto)'];
     }
     $missing = [];
-    if (trim((string)$ex['notes']) === '') {
+    if (trim((string)$ex['notes']) === '' && (int)$ex['cmts'] === 0) {
         $missing[] = 'o assentamento (observações/relatório da execução)';
     }
-    if ((int)$ex['evs'] < 1) {
+    if ($ex['result'] !== 'passed' && (int)$ex['evs'] < 1) {
         $missing[] = 'ao menos uma foto de evidência';
     }
     return $missing;
+}
+
+/**
+ * Chamado depois de registrar execução, comentário ou foto: ajusta o cartão do tester automaticamente.
+ * - Aprovado com assentamento → vai para Concluído e permanece lá.
+ * - Qualquer outra situação (reprovado, bloqueado, aprovado sem comentário) → Em Andamento.
+ * Retorna uma mensagem para o usuário (ou string vazia).
+ */
+function kanban_after_execution(int $caseId, int $testerId, string $result): string
+{
+    $a = q('SELECT * FROM assignments WHERE case_id = ? AND tester_id = ?', [$caseId, $testerId])->fetch();
+    if (!$a) {
+        return '';
+    }
+    if ($result === 'passed') {
+        $missing = kanban_missing($a);
+        if (!$missing) {
+            if ($a['kanban_status'] !== 'done') {
+                q("UPDATE assignments SET kanban_status = 'done' WHERE id = ?", [$a['id']]);
+            }
+            return 'Aprovado: o cartão foi movido para Concluído.';
+        }
+        if ($a['kanban_status'] !== 'doing') {
+            q("UPDATE assignments SET kanban_status = 'doing' WHERE id = ?", [$a['id']]);
+        }
+        return 'Aprovado registrado, mas o cartão ficou em Em Andamento: falta registrar ' . implode(' e ', $missing)
+            . '. Adicione um comentário na execução para concluí-lo.';
+    }
+    if ($a['kanban_status'] !== 'doing') {
+        q("UPDATE assignments SET kanban_status = 'doing' WHERE id = ?", [$a['id']]);
+    }
+    return '';
 }
 
 /**

@@ -11,13 +11,13 @@ $params = [$uid];
 if ($fProject) { $where[] = 'tc.project_id = ?'; $params[] = $fProject; }
 
 $rows = q("SELECT a.id aid, a.kanban_status, tc.id, tc.code, tc.title, tc.priority, p.name project, s.name suite,
-                  ex.result, ex.executed_at,
+                  ex.id exec_id, ex.result, ex.executed_at,
                   (SELECT d.id FROM defects d WHERE d.case_id = tc.id AND d.status = 'retest' AND d.retest_tester_id = a.tester_id ORDER BY d.id DESC LIMIT 1) retest_defect
            FROM assignments a
            JOIN test_cases tc ON tc.id = a.case_id
            JOIN projects p ON p.id = tc.project_id
            JOIN suites s ON s.id = tc.suite_id
-           LEFT JOIN executions ex ON ex.id = (SELECT MAX(id) FROM executions WHERE case_id = tc.id)
+           LEFT JOIN executions ex ON ex.id = (SELECT MAX(id) FROM executions WHERE case_id = tc.id AND tester_id = a.tester_id)
            WHERE " . implode(' AND ', $where) . " ORDER BY FIELD(tc.priority, 'critical','high','medium','low'), p.name, tc.code", $params)->fetchAll();
 
 $cols = array_fill_keys(array_keys(KANBAN_COLUMNS), []);
@@ -48,7 +48,7 @@ include __DIR__ . '/includes/header.php';
             <h2><?= e($label) ?></h2>
             <span class="kb-count" data-count><?= count($cols[$status]) ?></span>
         </header>
-        <?php if ($status === 'done'): ?><p class="kb-hint">Para concluir: assentamento + ao menos 1 foto de evidência.</p><?php endif; ?>
+        <?php if ($status === 'done'): ?><p class="kb-hint">Aprovado com comentário vai direto para cá. Reprovado/Bloqueado exigem assentamento + ao menos 1 foto.</p><?php endif; ?>
         <div class="kb-list" data-list>
             <?php foreach ($cols[$status] as $r): ?>
             <article class="kb-card lvl-<?= e($r['priority']) ?>" draggable="true" data-id="<?= (int)$r['aid'] ?>" data-rank="<?= $rank[$r['priority']] ?>" data-status="<?= e($status) ?>">
@@ -64,8 +64,11 @@ include __DIR__ . '/includes/header.php';
                 </p>
                 <div class="kb-actions">
                     <a class="kb-btn" href="execute.php?case_id=<?= (int)$r['id'] ?><?= $r['retest_defect'] ? '&defect_id=' . (int)$r['retest_defect'] : '' ?>" draggable="false">
-                        <?= $r['retest_defect'] ? 'Reteste' : 'Executar' ?>
+                        <?= $r['retest_defect'] ? 'Reteste' : ($status === 'done' ? 'Reexecutar' : 'Executar') ?>
                     </a>
+                    <?php if ($r['exec_id']): ?>
+                    <a class="kb-btn kb-btn-ghost kb-comment" href="execution_view.php?id=<?= (int)$r['exec_id'] ?>#comentarios" draggable="false">Comentar</a>
+                    <?php endif; ?>
                     <form method="post" action="kanban_move.php" class="move-form">
                         <?= csrf_field() ?>
                         <input type="hidden" name="id" value="<?= (int)$r['aid'] ?>">
