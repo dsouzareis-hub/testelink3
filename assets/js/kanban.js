@@ -1,4 +1,4 @@
-/* Kanban "Meus Testes": arrastar e soltar + seletor "Mover para". A regra de conclusão é validada no servidor. */
+/* Kanbans (Meus Testes e Meus Chamados): arrastar e soltar com mouse ou dedo. As regras são validadas no servidor. */
 (function () {
     'use strict';
 
@@ -42,8 +42,6 @@
     function lock(card) {
         card.classList.add('locked');
         card.setAttribute('draggable', 'false');
-        var form = card.querySelector('.move-form');
-        if (form) { form.remove(); }
         if (!card.querySelector('[data-lock]')) {
             var p = document.createElement('p');
             p.className = 'kb-lock';
@@ -52,8 +50,6 @@
             var meta = card.querySelector('.kb-meta');
             if (meta) { meta.parentNode.insertBefore(p, meta.nextSibling); }
         }
-        var open = card.querySelector('.kb-actions .kb-btn');
-        if (open) { open.textContent = 'Ver chamado'; open.classList.add('kb-btn-ghost', 'kb-comment'); }
     }
 
     // Move visualmente, grava no servidor e desfaz se o servidor recusar
@@ -214,20 +210,6 @@
     board.addEventListener('touchcancel', tchEnd);
     // Evita o menu "segurar para copiar" do navegador em cima do cartão
     board.addEventListener('contextmenu', function (ev) { if (ev.target.closest && ev.target.closest('.kb-card')) { ev.preventDefault(); } });
-
-    // ----- Seletor "Mover para" (teclado, toque e quem não arrasta) -----
-    board.addEventListener('submit', function (ev) {
-        var form = ev.target.closest('.move-form');
-        if (!form) { return; }
-        ev.preventDefault();
-        move(form.closest('.kb-card'), form.querySelector('select').value);
-    });
-    board.addEventListener('change', function (ev) {
-        var sel = ev.target.closest('.move-form select');
-        if (sel) { move(sel.closest('.kb-card'), sel.value); }
-    });
-    // Com JavaScript o seletor age ao escolher; o botão "Mover" só serve de reserva sem JS
-    board.classList.add('js');
 
     refresh();
 })();

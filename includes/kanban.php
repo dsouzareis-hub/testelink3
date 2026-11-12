@@ -3,7 +3,7 @@
  * Regras do Kanban "Meus Testes".
  * Colunas: waiting (Em aberto) → doing (Em Andamento) → done (Concluído).
  * Concluído mostra apenas o que foi concluído no dia (assignments.done_at); depois da meia-noite o cartão sai do quadro e fica só no Histórico.
- * Toda alteração de status (arrastar e soltar, seletor "Mover para", POST direto) passa por kanban_move(),
+ * Toda alteração de status (arrastar e soltar ou requisição direta) passa por kanban_move(),
  * que é onde a regra de conclusão é aplicada — não existe outro caminho que grave o status.
  */
 

@@ -3,7 +3,7 @@
  * Endpoint único de movimentação dos Kanbans.
  * - Tester: move o cartão de teste (kanban_move()).
  * - Desenvolvedor: move o chamado (dev_move()).
- * - fetch (drag and drop): responde JSON. Formulário comum (seletor sem JavaScript): grava flash e volta ao quadro.
+ * - fetch (drag and drop): responde JSON. Requisição comum (sem JavaScript): grava flash e volta ao quadro.
  * Em ambos os casos a regra é aplicada no servidor, valendo para qualquer forma de alteração.
  */
 require __DIR__ . '/includes/bootstrap.php';

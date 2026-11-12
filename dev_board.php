@@ -65,7 +65,7 @@ include __DIR__ . '/includes/header.php';
             <article class="kb-card lvl-<?= e($r['priority']) ?><?= $locked ? ' locked' : '' ?>" <?= $locked ? '' : 'draggable="true"' ?> data-id="<?= (int)$r['id'] ?>" data-rank="<?= $rank[$r['priority']] ?>" data-status="<?= e($status) ?>">
                 <div class="kb-top">
                     <span class="kb-badge lvl-<?= e($r['priority']) ?>" title="Urgência"><?= e(KANBAN_LEVELS[$r['priority']]) ?></span>
-                    <a class="kb-code" href="defect_view.php?id=<?= (int)$r['id'] ?>" draggable="false">#<?= (int)$r['id'] ?></a>
+                    <span class="kb-code">#<?= (int)$r['id'] ?></span>
                 </div>
                 <h3><?= e($r['title']) ?></h3>
                 <p class="kb-meta"><?= e($r['project']) ?> · Caso <?= e($r['code']) ?></p>
@@ -75,16 +75,7 @@ include __DIR__ . '/includes/header.php';
                     <?php if ($r['reopened_times'] && !$locked): ?><span class="kb-res res-retest">Reencaminhado após reteste</span><?php endif; ?>
                 </p>
                 <div class="kb-actions">
-                    <a class="kb-btn<?= $locked ? ' kb-btn-ghost kb-comment' : '' ?>" href="defect_view.php?id=<?= (int)$r['id'] ?>" draggable="false"><?= $locked ? 'Ver chamado' : 'Abrir chamado' ?></a>
-                    <?php if (!$locked): ?>
-                    <form method="post" action="kanban_move.php" class="move-form">
-                        <?= csrf_field() ?>
-                        <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
-                        <input type="hidden" name="project" value="<?= (int)$fProject ?>">
-                        <select name="status" aria-label="Mover chamado #<?= (int)$r['id'] ?> para"><?= options(DEV_COLUMNS, $status) ?></select>
-                        <button type="submit" class="kb-btn kb-btn-ghost">Mover</button>
-                    </form>
-                    <?php endif; ?>
+                    <a class="kb-btn" href="defect_view.php?id=<?= (int)$r['id'] ?>" draggable="false">Ver</a>
                 </div>
             </article>
             <?php endforeach; ?>
