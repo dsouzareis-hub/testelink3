@@ -82,5 +82,5 @@ include __DIR__ . '/includes/header.php';
     <?php endforeach; ?>
 </div>
 <div class="kb-toast" id="kb-toast" role="alert" aria-live="assertive" hidden></div>
-<script src="assets/js/kanban.js"></script>
+<script src="assets/js/kanban.js?v=<?= (int)@filemtime(__DIR__ . '/assets/js/kanban.js') ?>"></script>
 <?php include __DIR__ . '/includes/footer.php'; ?>

@@ -87,6 +87,89 @@
         filterSuites();
     }
 
+    // Visualizador de imagens (modal): clicar numa miniatura abre a foto grande sobre a própria página.
+    // Sem JavaScript o link continua abrindo a imagem normalmente.
+    (function () {
+        var overlay = null, img, caption, counter, prevBtn, nextBtn, closeBtn;
+        var group = [], index = 0, lastFocus = null;
+
+        function build() {
+            overlay = document.createElement('div');
+            overlay.className = 'lightbox';
+            overlay.setAttribute('role', 'dialog');
+            overlay.setAttribute('aria-modal', 'true');
+            overlay.setAttribute('aria-label', 'Visualização da imagem');
+            overlay.hidden = true;
+            overlay.innerHTML =
+                '<button type="button" class="lb-btn lb-close" aria-label="Fechar">&times;</button>' +
+                '<button type="button" class="lb-btn lb-nav lb-prev" aria-label="Foto anterior">&#10094;</button>' +
+                '<figure class="lb-figure"><img class="lb-img" alt="">' +
+                '<figcaption class="lb-caption"></figcaption></figure>' +
+                '<button type="button" class="lb-btn lb-nav lb-next" aria-label="Próxima foto">&#10095;</button>';
+            document.body.appendChild(overlay);
+            img = overlay.querySelector('.lb-img');
+            caption = overlay.querySelector('.lb-caption');
+            prevBtn = overlay.querySelector('.lb-prev');
+            nextBtn = overlay.querySelector('.lb-next');
+            closeBtn = overlay.querySelector('.lb-close');
+
+            closeBtn.addEventListener('click', close);
+            prevBtn.addEventListener('click', function () { show(index - 1); });
+            nextBtn.addEventListener('click', function () { show(index + 1); });
+            // Clique no fundo (fora da imagem e dos botões) fecha
+            overlay.addEventListener('click', function (ev) {
+                if (ev.target === overlay || ev.target.classList.contains('lb-figure')) { close(); }
+            });
+            document.addEventListener('keydown', function (ev) {
+                if (overlay.hidden) { return; }
+                if (ev.key === 'Escape') { close(); }
+                else if (ev.key === 'ArrowLeft') { show(index - 1); }
+                else if (ev.key === 'ArrowRight') { show(index + 1); }
+                else if (ev.key === 'Tab') {   // mantém o foco dentro do modal
+                    ev.preventDefault();
+                    var btns = [closeBtn, prevBtn, nextBtn].filter(function (b) { return !b.hidden; });
+                    var i = btns.indexOf(document.activeElement);
+                    btns[(i + (ev.shiftKey ? btns.length - 1 : 1)) % btns.length].focus();
+                }
+            });
+        }
+
+        function show(i) {
+            if (!group.length) { return; }
+            index = (i + group.length) % group.length;
+            var a = group[index];
+            img.src = a.href;
+            img.alt = a.title || '';
+            caption.textContent = (a.title || '') + (group.length > 1 ? '  ·  ' + (index + 1) + ' / ' + group.length : '');
+            prevBtn.hidden = nextBtn.hidden = group.length < 2;
+        }
+
+        function open(link) {
+            if (!overlay) { build(); }
+            var gallery = link.closest('.gallery');
+            group = Array.prototype.slice.call((gallery || document).querySelectorAll('a.thumb'));
+            lastFocus = overlay.contains(document.activeElement) ? link : document.activeElement;
+            overlay.hidden = false;
+            document.body.classList.add('lb-open');
+            show(group.indexOf(link));
+            closeBtn.focus();
+        }
+
+        function close() {
+            overlay.hidden = true;
+            img.removeAttribute('src');
+            document.body.classList.remove('lb-open');
+            if (lastFocus && lastFocus.focus) { lastFocus.focus(); }
+        }
+
+        document.addEventListener('click', function (ev) {
+            var link = ev.target.closest && ev.target.closest('a.thumb');
+            if (!link || ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.button === 1) { return; }
+            ev.preventDefault();
+            open(link);
+        });
+    })();
+
     // Marcar/desmarcar todos (atribuições)
     var all = document.querySelector('[data-check-all]');
     if (all) {
