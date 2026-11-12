@@ -136,9 +136,10 @@ CREATE TABLE defects (
     description  TEXT NOT NULL,
     severity     ENUM('low','medium','high','critical') NOT NULL DEFAULT 'medium',
     priority     ENUM('low','medium','high','critical') NOT NULL DEFAULT 'medium',
-    status       ENUM('open','fixing','fixed','reopened','closed') NOT NULL DEFAULT 'open',
+    -- triage = reprovado pelo tester, aguardando o Admin encaminhar; assigned_to só é preenchido ao encaminhar
+    status       ENUM('triage','open','fixing','fixed','reopened','closed') NOT NULL DEFAULT 'triage',
     reported_by  INT UNSIGNED NOT NULL,
-    assigned_to  INT UNSIGNED NOT NULL,
+    assigned_to  INT UNSIGNED NULL,
     created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     KEY idx_defect_status (status),
@@ -159,6 +160,22 @@ CREATE TABLE defect_comments (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (defect_id) REFERENCES defects(id) ON DELETE CASCADE,
     FOREIGN KEY (user_id)   REFERENCES users(id)   ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- Fotos anexadas a comentários do defeito (desenvolvedor, admin, tester)
+CREATE TABLE defect_attachments (
+    id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    defect_id     INT UNSIGNED NOT NULL,
+    comment_id    INT UNSIGNED NULL,
+    user_id       INT UNSIGNED NOT NULL,
+    original_name VARCHAR(255) NOT NULL,
+    stored_name   VARCHAR(80) NOT NULL,
+    mime          VARCHAR(40) NOT NULL,
+    size          INT UNSIGNED NOT NULL,
+    created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (defect_id)  REFERENCES defects(id)         ON DELETE CASCADE,
+    FOREIGN KEY (comment_id) REFERENCES defect_comments(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id)    REFERENCES users(id)           ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 -- ============================================================

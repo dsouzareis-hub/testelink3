@@ -8,14 +8,14 @@ $includeAll = !empty($_GET['all']);
 
 $where = [];
 $params = [];
-if (!$includeAll) { $where[] = "d.status IN ('open','fixing','reopened')"; }
+if (!$includeAll) { $where[] = "d.status IN ('triage','open','fixing','reopened')"; }
 if ($fProject) { $where[] = 'd.project_id = ?'; $params[] = $fProject; }
 if (isset(LEVELS[$fSeverity])) { $where[] = 'd.severity = ?'; $params[] = $fSeverity; }
 
 $rows = q('SELECT d.id, d.title, d.severity, d.priority, d.status, d.created_at, tc.code, p.name project,
                   dev.name developer, rep.name reporter
            FROM defects d JOIN test_cases tc ON tc.id = d.case_id JOIN projects p ON p.id = d.project_id
-           JOIN users dev ON dev.id = d.assigned_to JOIN users rep ON rep.id = d.reported_by
+           LEFT JOIN users dev ON dev.id = d.assigned_to JOIN users rep ON rep.id = d.reported_by
            ' . ($where ? 'WHERE ' . implode(' AND ', $where) : '') . '
            ORDER BY FIELD(d.severity, \'critical\',\'high\',\'medium\',\'low\'), d.created_at', $params)->fetchAll();
 
@@ -56,7 +56,7 @@ include __DIR__ . '/includes/header.php';
                 <td><?= level_badge($d['severity']) ?></td>
                 <td><?= e(LEVELS[$d['priority']]) ?></td>
                 <td><?= defect_badge($d['status']) ?></td>
-                <td><?= e($d['developer']) ?></td>
+                <td><?= $d['developer'] ? e($d['developer']) : 'Não encaminhado' ?></td>
                 <td><?= fmt_date($d['created_at']) ?></td>
             </tr>
         <?php endforeach; ?>

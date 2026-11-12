@@ -12,13 +12,14 @@ $fSeverity = $_GET['severity'] ?? '';
 $where = ['1=1'];
 $params = [];
 if ($role === 'developer') {
-    $where[] = 'd.assigned_to = ?'; $params[] = $uid;
+    // Só o que está com ele; depois de concluir, o chamado volta ao Admin e some daqui
+    $where[] = "d.assigned_to = ? AND d.status IN ('open','fixing')"; $params[] = $uid;
 } elseif ($role === 'tester') {
     $where[] = '(d.reported_by = ? OR d.case_id IN (SELECT case_id FROM assignments WHERE tester_id = ?))';
     array_push($params, $uid, $uid);
 }
 if ($fStatus === 'open_all') {
-    $where[] = "d.status IN ('open','fixing','reopened')";
+    $where[] = "d.status IN ('triage','open','fixing','reopened')";
 } elseif (isset(DEFECT_STATUS[$fStatus])) {
     $where[] = 'd.status = ?'; $params[] = $fStatus;
 }
@@ -28,7 +29,7 @@ if (isset(LEVELS[$fSeverity])) { $where[] = 'd.severity = ?'; $params[] = $fSeve
 $rows = q('SELECT d.id, d.title, d.severity, d.priority, d.status, d.updated_at, tc.code, p.name project,
                   dev.name developer, rep.name reporter
            FROM defects d JOIN test_cases tc ON tc.id = d.case_id JOIN projects p ON p.id = d.project_id
-           JOIN users dev ON dev.id = d.assigned_to JOIN users rep ON rep.id = d.reported_by
+           LEFT JOIN users dev ON dev.id = d.assigned_to JOIN users rep ON rep.id = d.reported_by
            WHERE ' . implode(' AND ', $where) . ' ORDER BY d.updated_at DESC LIMIT 300', $params)->fetchAll();
 
 $pageTitle = 'Defeitos';
@@ -57,7 +58,7 @@ include __DIR__ . '/includes/header.php';
                 <td><?= level_badge($d['severity']) ?></td>
                 <td><?= level_badge($d['priority']) ?></td>
                 <td><?= defect_badge($d['status']) ?></td>
-                <td><?= e($d['developer']) ?></td>
+                <td><?= $d['developer'] ? e($d['developer']) : '<span class="muted">Não encaminhado</span>' ?></td>
                 <td><?= fmt_dt($d['updated_at']) ?></td>
             </tr>
         <?php endforeach; ?>

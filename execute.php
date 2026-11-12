@@ -23,7 +23,6 @@ if (is_post()) {
     csrf_check();
     $result = post('result');
     $notes = post('notes');
-    $forward = !$retest && $result === 'failed' && isset($_POST['forward']);
     $error = null;
 
     if (!isset(RESULTS[$result])) {
@@ -42,9 +41,10 @@ if (is_post()) {
             // Ao registrar uma execução, o cartão do Kanban sai de "Aguardando" para "Em Andamento"
             q("UPDATE assignments SET kanban_status = 'doing' WHERE case_id = ? AND tester_id = ? AND kanban_status = 'waiting'", [$caseId, $uid]);
 
+            // Reprovado: abre o chamado "Aguardando triagem". O tester NÃO escolhe o desenvolvedor — o Admin encaminha.
             $defectNew = null;
-            if ($forward) {
-                $defectNew = create_defect($execId, defect_data_from_post(), $uid);
+            if (!$retest && $result === 'failed') {
+                $defectNew = create_triage_defect($execId, $uid);
             }
             if ($retest) {
                 // Reteste: aprovado fecha o defeito; reprovado reabre; bloqueado só comenta
@@ -66,7 +66,7 @@ if (is_post()) {
         [$saved, $uploadErrors] = save_evidences($execId);
         foreach ($uploadErrors as $m) { flash('warn', $m); }
         flash('success', 'Execução registrada' . ($saved ? " com $saved evidência(s)" : '') . '.'
-            . ($defectNew ? " Defeito #$defectNew encaminhado ao desenvolvedor." : ''));
+            . ($defectNew ? " Chamado #$defectNew aberto: o Administrador fará o encaminhamento ao desenvolvedor." : ''));
         redirect('execution_view.php?id=' . $execId);
     }
     flash('error', $error);
@@ -120,13 +120,8 @@ include __DIR__ . '/includes/header.php';
         <div class="gallery preview-list" data-preview-box></div>
     </div>
 
-    <?php if (!$retest): ?>
-    <div class="forward-toggle" hidden style="margin-top:16px">
-        <label class="check"><input type="checkbox" name="forward" value="1" data-forward-check <?= isset($_POST['forward']) ? 'checked' : '' ?>>
-            <strong>Encaminhar para o Desenvolvedor</strong> (cria um defeito vinculado a esta execução)</label>
-    </div>
-    <?php render_forward_fields('[' . $case['code'] . '] ' . $case['title'], true); ?>
-    <?php endif; ?>
+    <p class="muted" style="margin-top:14px">Se o resultado for <strong>Reprovado</strong>, explique no assentamento (e anexe fotos, se quiser).
+        O chamado vai para o Administrador, que decide o encaminhamento ao desenvolvedor.</p>
 
     <div class="form-actions">
         <button class="btn" type="submit"><?= icon('check', 16) ?> Salvar execução</button>

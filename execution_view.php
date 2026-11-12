@@ -12,19 +12,6 @@ if (!$ex) { not_found(); }
 if ($role === 'tester' && (int)$ex['tester_id'] !== $uid) { forbidden(); }
 
 $defect = q('SELECT id, title, status FROM defects WHERE execution_id = ?', [$id])->fetch();
-$canForward = $role === 'tester' && $ex['result'] === 'failed' && !$defect;
-
-// Encaminhamento tardio (execução reprovada ainda sem defeito)
-if (is_post() && $canForward) {
-    csrf_check();
-    try {
-        $dId = create_defect($id, defect_data_from_post(), $uid);
-        flash('success', "Defeito #$dId encaminhado ao desenvolvedor.");
-        redirect('execution_view.php?id=' . $id);
-    } catch (InvalidArgumentException $e) {
-        flash('error', $e->getMessage());
-    }
-}
 
 $evidences = execution_evidences($id);
 
@@ -52,11 +39,4 @@ include __DIR__ . '/includes/header.php';
     <p class="no-print"><a class="btn btn-ghost" href="report_case.php?id=<?= (int)$ex['case_id'] ?>"><?= icon('printer', 16) ?> Relatório do caso</a></p>
 </div>
 
-<?php if ($canForward): ?>
-<form method="post" class="card">
-    <?= csrf_field() ?>
-    <?php render_forward_fields('[' . $ex['code'] . '] ' . $ex['title']); ?>
-    <div class="form-actions"><button class="btn" type="submit"><?= icon('send', 16) ?> Encaminhar para Desenvolvedor</button></div>
-</form>
-<?php endif; ?>
 <?php include __DIR__ . '/includes/footer.php'; ?>

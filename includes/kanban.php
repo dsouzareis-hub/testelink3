@@ -11,6 +11,34 @@ const KANBAN_COLUMNS = ['waiting' => 'Aguardando', 'doing' => 'Em Andamento', 'd
 /** Rótulos de criticidade do Kanban (masculino, como pedido). */
 const KANBAN_LEVELS = ['critical' => 'Crítico', 'high' => 'Alto', 'medium' => 'Médio', 'low' => 'Baixo'];
 
+/** Colunas do Kanban do desenvolvedor (status do chamado). Sem "Reaberto": isso é decisão do Admin/reteste. */
+const DEV_COLUMNS = ['open' => 'Aberto', 'fixing' => 'Em Andamento', 'fixed' => 'Concluído'];
+
+/**
+ * Move um chamado no Kanban do desenvolvedor.
+ * Aberto ⇄ Em Andamento é livre. Concluído devolve o chamado ao Admin: o dev perde o acesso (o cartão some do quadro).
+ * Retorna ['ok', 'message', 'status', 'removed'?].
+ */
+function dev_move(int $defectId, string $to, int $devId): array
+{
+    $d = q("SELECT id, status FROM defects WHERE id = ? AND assigned_to = ? AND status IN ('open','fixing')", [$defectId, $devId])->fetch();
+    if (!$d) {
+        return ['ok' => false, 'message' => 'Chamado não encontrado ou já devolvido ao Administrador. Recarregue a página.', 'status' => '', 'removed' => true];
+    }
+    if (!isset(DEV_COLUMNS[$to])) {
+        return ['ok' => false, 'message' => 'Status inválido.', 'status' => $d['status']];
+    }
+    if ($to === $d['status']) {
+        return ['ok' => true, 'message' => '', 'status' => $to];
+    }
+    if ($to === 'fixed') {
+        set_defect_status($defectId, 'fixed', $devId, 'Concluído pelo desenvolvedor; chamado devolvido ao Administrador.');
+        return ['ok' => true, 'message' => 'Chamado #' . $defectId . ' concluído e devolvido ao Administrador.', 'status' => 'fixed', 'removed' => true];
+    }
+    set_defect_status($defectId, $to, $devId);
+    return ['ok' => true, 'message' => 'Movido para ' . DEV_COLUMNS[$to] . '.', 'status' => $to];
+}
+
 /**
  * O que falta para concluir? Considera a última execução deste tester, neste caso, dentro do ciclo atual.
  * Exige: assentamento preenchido E ao menos uma foto de evidência.

@@ -42,14 +42,20 @@ if ($role !== 'developer') {
 $dWhere = [];
 $dParams = [];
 if ($projectId) { $dWhere[] = 'd.project_id = ?'; $dParams[] = $projectId; }
-if ($role === 'developer') { $dWhere[] = 'd.assigned_to = ?'; $dParams[] = $uid; }
+if ($role === 'developer') { $dWhere[] = "d.assigned_to = ? AND d.status IN ('open','fixing')"; $dParams[] = $uid; }
 if ($role === 'tester') { $dWhere[] = 'd.reported_by = ?'; $dParams[] = $uid; }
 $dSql = $dWhere ? 'WHERE ' . implode(' AND ', $dWhere) : '';
 $dCounts = array_fill_keys(array_keys(DEFECT_STATUS), 0);
 foreach (q("SELECT d.status, COUNT(*) c FROM defects d $dSql GROUP BY d.status", $dParams) as $r) {
     $dCounts[$r['status']] = (int)$r['c'];
 }
-$openDefects = $dCounts['open'] + $dCounts['fixing'] + $dCounts['reopened'];
+$openDefects = $dCounts['triage'] + $dCounts['open'] + $dCounts['fixing'] + $dCounts['reopened'];
+// Dev: chamados que ele já concluiu (histórico; ele não tem mais acesso a eles)
+$devDone = $role === 'developer'
+    ? (int)q("SELECT COUNT(DISTINCT defect_id) FROM defect_comments WHERE user_id = ? AND new_status = 'fixed'", [$uid])->fetchColumn() : 0;
+// Admin: chamados esperando encaminhamento (novos reprovados e reabertos pelo reteste) e devolvidos pelo dev
+$toForward = $role === 'admin' ? (int)q("SELECT COUNT(*) FROM defects WHERE status IN ('triage','reopened')")->fetchColumn() : 0;
+$returned = $role === 'admin' ? (int)q("SELECT COUNT(*) FROM defects WHERE status = 'fixed'")->fetchColumn() : 0;
 
 $recentDefects = q("SELECT d.id, d.title, d.status, d.severity, d.updated_at, tc.code
                     FROM defects d JOIN test_cases tc ON tc.id = d.case_id $dSql
@@ -74,6 +80,14 @@ $pageTitle = 'Dashboard';
 $active = 'dashboard.php';
 include __DIR__ . '/includes/header.php';
 ?>
+<?php if ($toForward): ?>
+<div class="alert alert-warn"><?= $toForward ?> chamado(s) aguardando encaminhamento ao desenvolvedor.
+    <a href="defects.php?status=triage"><strong>Encaminhar agora</strong></a></div>
+<?php endif; ?>
+<?php if ($returned): ?>
+<div class="alert alert-info"><?= $returned ?> chamado(s) concluído(s) pelo desenvolvedor e devolvido(s) ao Administrador (reteste pelo tester).
+    <a href="defects.php?status=fixed"><strong>Ver</strong></a></div>
+<?php endif; ?>
 <?php if ($pendingUsers): ?>
 <div class="alert alert-warn"><?= $pendingUsers ?> solicitação(ões) de cadastro aguardando aprovação.
     <a href="users.php"><strong>Analisar agora</strong></a></div>
@@ -92,9 +106,8 @@ include __DIR__ . '/includes/header.php';
 <?php if ($role === 'developer'): ?>
     <div class="stats">
         <div class="stat red"><div class="num"><?= $dCounts['open'] ?></div><div class="lbl">Abertos</div></div>
-        <div class="stat"><div class="num"><?= $dCounts['fixing'] ?></div><div class="lbl">Em correção</div></div>
-        <div class="stat amber"><div class="num"><?= $dCounts['reopened'] ?></div><div class="lbl">Reabertos</div></div>
-        <div class="stat teal"><div class="num"><?= $dCounts['fixed'] ?></div><div class="lbl">Corrigidos (aguardando reteste)</div></div>
+        <div class="stat"><div class="num"><?= $dCounts['fixing'] ?></div><div class="lbl">Em andamento</div></div>
+        <div class="stat teal"><div class="num"><?= $devDone ?></div><div class="lbl">Concluídos por você</div></div>
     </div>
 <?php else: ?>
     <div class="stats">
@@ -135,7 +148,8 @@ include __DIR__ . '/includes/header.php';
     <?php endif; ?>
 
     <div class="card">
-        <div class="card-head"><h2>Defeitos recentes</h2><a class="btn btn-sm btn-ghost" href="defects.php">Ver todos</a></div>
+        <div class="card-head"><h2><?= $role === 'developer' ? 'Meus chamados' : 'Defeitos recentes' ?></h2>
+            <a class="btn btn-sm btn-ghost" href="<?= $role === 'developer' ? 'dev_board.php' : 'defects.php' ?>"><?= $role === 'developer' ? 'Abrir Kanban' : 'Ver todos' ?></a></div>
         <div class="table-wrap"><table>
             <thead><tr><th>#</th><th>Título</th><th>Severidade</th><th>Status</th></tr></thead>
             <tbody>

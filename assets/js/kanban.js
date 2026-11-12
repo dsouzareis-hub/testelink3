@@ -60,7 +60,14 @@
                 var sel = card.querySelector('select[name="status"]');
                 if (res.ok) {
                     if (sel) { sel.value = to; }
+                    // Chamado concluído pelo dev: sai do quadro (foi devolvido ao Admin e o dev perde o acesso)
+                    if (res.removed) { card.remove(); refresh(); }
                     showToast(res.message, true);
+                } else if (res.removed) {
+                    // O chamado já não está com este usuário: tira do quadro
+                    card.remove();
+                    refresh();
+                    showToast(res.message, false);
                 } else {
                     originList.insertBefore(card, originNext);
                     card.dataset.status = from;

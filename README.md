@@ -59,9 +59,9 @@ testlink/
 
 | Perfil | Pode |
 |---|---|
-| **Administrador** | CRUD de usuários, projetos, suítes e casos; atribuir casos a testers; relatórios; configurações |
-| **Tester** | Ver casos atribuídos, executar (Aprovado/Reprovado/Bloqueado), assentamento, múltiplas evidências, encaminhar reprovação ao desenvolvedor, reteste, histórico próprio |
-| **Desenvolvedor** | Ver apenas defeitos encaminhados a ele, mudar status (Aberto, Em correção, Corrigido, Reaberto), comentar |
+| **Administrador** | CRUD de usuários, projetos, suítes e casos; atribuir casos a testers; **encaminhar chamados ao desenvolvedor** (só urgência + desenvolvedor); relatórios; configurações |
+| **Tester** | Ver casos atribuídos (Kanban), executar (Aprovado/Reprovado/Bloqueado), assentamento, múltiplas evidências, reteste, histórico próprio. **Não encaminha ao desenvolvedor** |
+| **Desenvolvedor** | Kanban "Meus Chamados" com os chamados encaminhados a ele; status Aberto / Em andamento / Concluído; comentário de retorno **e fotos**. Ao concluir, perde o acesso e o chamado volta ao Admin |
 | **Usuário (leitura)** | Ver dashboard, casos, execuções, defeitos e relatórios — sem editar nada |
 
 ## Fluxo principal
@@ -69,12 +69,13 @@ testlink/
 1. Admin cria projeto → suítes → casos de teste (cada edição de conteúdo gera uma nova versão no histórico).
 2. Admin atribui casos ao tester em **Atribuições**.
 3. Tester abre **Meus Testes → Executar**, escolhe o resultado, escreve o assentamento e anexa prints.
-4. Se **Reprovado**, marca *Encaminhar para o Desenvolvedor* (ou faz isso depois, na tela da execução): é criado um defeito vinculado ao caso e à execução.
-5. Desenvolvedor analisa, comenta e marca **Corrigido** (pronto para reteste).
-6. Tester vê o caso como *Aguardando reteste* e executa o **Reteste**: aprovado → defeito **Fechado**; reprovado → defeito **Reaberto**.
-7. Admin/usuário de leitura gera e imprime os relatórios.
+4. Se **Reprovado**, o tester explica no assentamento e anexa fotos se quiser. O sistema abre o chamado como **Aguardando triagem** (o tester não escolhe desenvolvedor).
+5. O **Admin** abre o chamado e usa *Encaminhar para o Desenvolvedor*: apenas dois selects, **urgência** e **desenvolvedor** (sem campo de comentário). O chamado fica **Aberto**.
+6. O **Desenvolvedor** vê o chamado no seu Kanban, trabalha (Aberto ⇄ Em andamento), comenta e anexa fotos, e **conclui**. Ao concluir ele perde o acesso e o chamado volta ao Admin (status *Concluído pelo Dev*).
+7. O caso volta ao Kanban do tester como *Aguardando* para o **reteste**: aprovado → chamado **Fechado**; reprovado → **Reaberto** (volta ao Admin, que reencaminha).
+8. Admin/usuário de leitura gera e imprime os relatórios.
 
-> Além dos 4 status pedidos para o defeito, o sistema usa **Fechado** (definido automaticamente pelo reteste aprovado, ou pelo admin) para distinguir "corrigido aguardando reteste" de "validado".
+> O desenvolvedor não tem a opção *Reaberto*: ela só ocorre automaticamente quando o reteste reprova. O Admin também pode fechar um chamado manualmente.
 
 ## Cadastro com aprovação do administrador
 
@@ -96,7 +97,7 @@ A tela Meus Testes é um quadro Kanban escuro (preto/grafite com vermelho) com a
 - Quando um defeito do caso é marcado como **Corrigido**, o cartão volta para Aguardando (reteste) e começa um novo ciclo.
 - **Criticidade** (prioridade do caso) em etiquetas vermelhas de intensidade crescente: Baixo < Médio < Alto < Crítico (o mais vibrante, com brilho).
 
-> Já instalou antes? Execute uma vez `migration_registro.sql` e `migration_kanban.sql` no banco `testlink3`.
+> Já instalou antes? Execute uma vez, nesta ordem, `migration_registro.sql`, `migration_kanban.sql` e `migration_fluxo.sql` no banco `testlink3`.
 
 ## Relatórios
 

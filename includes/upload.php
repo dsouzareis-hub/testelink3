@@ -1,6 +1,6 @@
 <?php
 /**
- * Upload seguro de evidências (somente imagens jpg/png/webp).
+ * Upload seguro de imagens (somente jpg/png/webp): evidências de execução, fotos de defeitos e logo.
  * - Valida o tipo real com finfo + getimagesize (não confia na extensão enviada)
  * - Grava com nome aleatório, fora do alcance direto do navegador (uploads/.htaccess)
  */
@@ -27,10 +27,11 @@ function max_upload_bytes(): int
 }
 
 /**
- * Processa $_FILES['evidences'] (múltiplos arquivos) e vincula à execução.
+ * Valida e grava as imagens de um campo <input type="file" multiple>.
+ * Para cada arquivo salvo chama $onSaved(nomeOriginal, nomeGravado, mime, tamanho).
  * Retorna [quantidade_salva, [mensagens de erro]].
  */
-function save_evidences(int $executionId, string $field = 'evidences'): array
+function process_image_uploads(string $field, callable $onSaved): array
 {
     $saved = 0;
     $errors = [];
@@ -49,7 +50,7 @@ function save_evidences(int $executionId, string $field = 'evidences'): array
             continue;
         }
         if ($saved >= MAX_FILES_PER_EXECUTION) {
-            $errors[] = 'Limite de ' . MAX_FILES_PER_EXECUTION . ' imagens por execução atingido.';
+            $errors[] = 'Limite de ' . MAX_FILES_PER_EXECUTION . ' imagens por envio atingido.';
             break;
         }
         $label = basename((string)$origName);
@@ -78,24 +79,43 @@ function save_evidences(int $executionId, string $field = 'evidences'): array
         }
         @chmod(UPLOAD_DIR . $stored, 0644);
 
-        q('INSERT INTO evidences (execution_id, original_name, stored_name, mime, size) VALUES (?,?,?,?,?)', [
-            $executionId, mb_substr($label, 0, 255), $stored, $mime, (int)$f['size'][$i],
-        ]);
+        $onSaved(mb_substr($label, 0, 255), $stored, $mime, (int)$f['size'][$i]);
         $saved++;
     }
     return [$saved, $errors];
 }
 
-/** Remove do disco as evidências de uma lista de casos (usar ANTES de excluir os registros). */
+/** Evidências da execução (campo "evidences[]"). */
+function save_evidences(int $executionId, string $field = 'evidences'): array
+{
+    return process_image_uploads($field, function ($name, $stored, $mime, $size) use ($executionId) {
+        q('INSERT INTO evidences (execution_id, original_name, stored_name, mime, size) VALUES (?,?,?,?,?)',
+            [$executionId, $name, $stored, $mime, $size]);
+    });
+}
+
+/** Fotos anexadas a um comentário de defeito (campo "photos[]"). */
+function save_defect_images(int $defectId, ?int $commentId, int $userId, string $field = 'photos'): array
+{
+    return process_image_uploads($field, function ($name, $stored, $mime, $size) use ($defectId, $commentId, $userId) {
+        q('INSERT INTO defect_attachments (defect_id, comment_id, user_id, original_name, stored_name, mime, size) VALUES (?,?,?,?,?,?,?)',
+            [$defectId, $commentId, $userId, $name, $stored, $mime, $size]);
+    });
+}
+
+/** Remove do disco as imagens (evidências e fotos de defeitos) de uma lista de casos — usar ANTES de excluir os registros. */
 function purge_evidence_files(array $caseIds): void
 {
     if (!$caseIds) {
         return;
     }
     $in = implode(',', array_fill(0, count($caseIds), '?'));
-    $rows = q("SELECT ev.stored_name FROM evidences ev JOIN executions ex ON ex.id = ev.execution_id
-               WHERE ex.case_id IN ($in)", array_values($caseIds))->fetchAll(PDO::FETCH_COLUMN);
-    foreach ($rows as $name) {
+    $ids = array_values($caseIds);
+    $names = q("SELECT ev.stored_name FROM evidences ev JOIN executions ex ON ex.id = ev.execution_id
+                WHERE ex.case_id IN ($in)", $ids)->fetchAll(PDO::FETCH_COLUMN);
+    $names = array_merge($names, q("SELECT da.stored_name FROM defect_attachments da JOIN defects d ON d.id = da.defect_id
+                WHERE d.case_id IN ($in)", $ids)->fetchAll(PDO::FETCH_COLUMN));
+    foreach ($names as $name) {
         $path = UPLOAD_DIR . basename($name);
         if (is_file($path)) {
             @unlink($path);
@@ -109,17 +129,23 @@ function execution_evidences(int $executionId): array
     return q('SELECT id, original_name FROM evidences WHERE execution_id = ? ORDER BY id', [$executionId])->fetchAll();
 }
 
-/** HTML de uma galeria de evidências (miniaturas clicáveis). */
-function evidence_gallery(array $evidences): string
+/** Miniaturas clicáveis; $route = 'id' (evidência da execução) ou 'att' (foto de defeito). */
+function image_gallery(array $items, string $route = 'id'): string
 {
-    if (!$evidences) {
-        return '<p class="muted">Nenhuma evidência anexada.</p>';
+    if (!$items) {
+        return '<p class="muted">Nenhuma imagem anexada.</p>';
     }
     $html = '<div class="gallery">';
-    foreach ($evidences as $ev) {
-        $url = 'file.php?id=' . (int)$ev['id'];
-        $html .= '<a href="' . $url . '" target="_blank" rel="noopener" class="thumb" title="' . e($ev['original_name']) . '">'
-            . '<img src="' . $url . '" alt="' . e($ev['original_name']) . '" loading="lazy"></a>';
+    foreach ($items as $it) {
+        $url = 'file.php?' . $route . '=' . (int)$it['id'];
+        $html .= '<a href="' . $url . '" target="_blank" rel="noopener" class="thumb" title="' . e($it['original_name']) . '">'
+            . '<img src="' . $url . '" alt="' . e($it['original_name']) . '" loading="lazy"></a>';
     }
     return $html . '</div>';
+}
+
+/** Galeria de evidências da execução (compatível com o uso anterior). */
+function evidence_gallery(array $evidences): string
+{
+    return image_gallery($evidences, 'id');
 }

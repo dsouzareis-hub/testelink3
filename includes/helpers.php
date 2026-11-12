@@ -101,11 +101,11 @@ const ROLES = [
 const RESULTS = ['passed' => 'Aprovado', 'failed' => 'Reprovado', 'blocked' => 'Bloqueado'];
 const LEVELS = ['low' => 'Baixa', 'medium' => 'Média', 'high' => 'Alta', 'critical' => 'Crítica'];
 const DEFECT_STATUS = [
-    'open' => 'Aberto', 'fixing' => 'Em correção', 'fixed' => 'Corrigido',
-    'reopened' => 'Reaberto', 'closed' => 'Fechado',
+    'triage' => 'Aguardando triagem', 'open' => 'Aberto', 'fixing' => 'Em andamento',
+    'fixed' => 'Concluído pelo Dev', 'reopened' => 'Reaberto', 'closed' => 'Fechado',
 ];
 /** Status considerados "defeito aberto" nos relatórios e dashboard. */
-const OPEN_DEFECT_STATUS = ['open', 'fixing', 'reopened'];
+const OPEN_DEFECT_STATUS = ['triage', 'open', 'fixing', 'reopened'];
 
 function badge(string $text, string $class): string
 {
@@ -129,7 +129,7 @@ function level_badge(string $l): string
 
 function defect_badge(string $s): string
 {
-    $map = ['open' => 'red', 'fixing' => 'blue', 'fixed' => 'teal', 'reopened' => 'amber', 'closed' => 'gray'];
+    $map = ['triage' => 'amber', 'open' => 'red', 'fixing' => 'blue', 'fixed' => 'teal', 'reopened' => 'amber', 'closed' => 'gray'];
     return badge(DEFECT_STATUS[$s] ?? $s, $map[$s] ?? 'gray');
 }
 
@@ -233,7 +233,7 @@ function nav_items(string $role): array
         case 'tester':
             return [$dash, ['my_tests.php', 'Meus Testes', 'play'], ['history.php', 'Histórico', 'clock'], $defects, $profile];
         case 'developer':
-            return [$dash, $defects, $profile];
+            return [$dash, ['dev_board.php', 'Meus Chamados', 'bug'], $profile];
         default: // viewer
             return [$dash, ['cases.php', 'Casos de Teste', 'clipboard'], ['history.php', 'Execuções', 'clock'], $defects, $reports, $profile];
     }

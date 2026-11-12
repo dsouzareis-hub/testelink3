@@ -39,7 +39,7 @@ function cell_level(string $l): array
 
 function cell_defect(string $s): array
 {
-    $map = ['open' => [[153, 27, 27], [254, 226, 226]], 'fixing' => [[30, 64, 175], [219, 234, 254]],
+    $map = ['triage' => [[146, 64, 14], [254, 243, 199]], 'open' => [[153, 27, 27], [254, 226, 226]], 'fixing' => [[30, 64, 175], [219, 234, 254]],
             'fixed' => [[15, 118, 110], [204, 251, 241]], 'reopened' => [[146, 64, 14], [254, 243, 199]],
             'closed' => [[75, 85, 99], [229, 231, 235]]];
     [$fg, $bg] = $map[$s];
@@ -79,7 +79,7 @@ if ($type === 'execution') {
     if ($fTo) { $where[] = 'ex.executed_at <= ?'; $params[] = $fTo . ' 23:59:59'; }
 
     $rows = q('SELECT tc.code, tc.title, p.name project, s.name suite, ex.result, ex.executed_at, u.name tester,
-                      (SELECT COUNT(*) FROM defects d WHERE d.case_id = tc.id AND d.status IN (\'open\',\'fixing\',\'reopened\')) open_defects
+                      (SELECT COUNT(*) FROM defects d WHERE d.case_id = tc.id AND d.status IN (\'triage\',\'open\',\'fixing\',\'reopened\')) open_defects
                FROM test_cases tc JOIN projects p ON p.id = tc.project_id JOIN suites s ON s.id = tc.suite_id
                LEFT JOIN executions ex ON ex.id = (SELECT MAX(id) FROM executions WHERE case_id = tc.id)
                LEFT JOIN users u ON u.id = ex.tester_id
@@ -167,12 +167,12 @@ if ($type === 'defects') {
     $includeAll = !empty($_GET['all']);
     $where = [];
     $params = [];
-    if (!$includeAll) { $where[] = "d.status IN ('open','fixing','reopened')"; }
+    if (!$includeAll) { $where[] = "d.status IN ('triage','open','fixing','reopened')"; }
     if ($fProject) { $where[] = 'd.project_id = ?'; $params[] = $fProject; }
     if (isset(LEVELS[$fSeverity])) { $where[] = 'd.severity = ?'; $params[] = $fSeverity; }
     $rows = q('SELECT d.id, d.title, d.severity, d.priority, d.status, d.created_at, tc.code, p.name project, dev.name developer
                FROM defects d JOIN test_cases tc ON tc.id = d.case_id JOIN projects p ON p.id = d.project_id
-               JOIN users dev ON dev.id = d.assigned_to ' . ($where ? 'WHERE ' . implode(' AND ', $where) : '') . '
+               LEFT JOIN users dev ON dev.id = d.assigned_to ' . ($where ? 'WHERE ' . implode(' AND ', $where) : '') . '
                ORDER BY FIELD(d.severity, \'critical\',\'high\',\'medium\',\'low\'), d.created_at', $params)->fetchAll();
     $bySev = array_fill_keys(array_keys(LEVELS), 0);
     foreach ($rows as $r) { $bySev[$r['severity']]++; }
@@ -210,7 +210,7 @@ if ($type === 'case') {
 
     $execs = q('SELECT ex.*, u.name tester FROM executions ex JOIN users u ON u.id = ex.tester_id WHERE ex.case_id = ? ORDER BY ex.id DESC', [$id])->fetchAll();
     $defects = q('SELECT d.id, d.title, d.status, d.severity, d.execution_id, dev.name developer FROM defects d
-                  JOIN users dev ON dev.id = d.assigned_to WHERE d.case_id = ? ORDER BY d.id', [$id])->fetchAll();
+                  LEFT JOIN users dev ON dev.id = d.assigned_to WHERE d.case_id = ? ORDER BY d.id', [$id])->fetchAll();
 
     $pdf = new_pdf('Relatório do Caso de Teste ' . $case['code']);
     $pdf->heading($case['code'] . ' — ' . $case['title']);
