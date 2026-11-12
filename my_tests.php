@@ -6,12 +6,15 @@ $uid = (int)$user['id'];
 
 $fProject = get_int('project');
 
-$where = ['a.tester_id = ?', "tc.status = 'active'"];
+$where = ['a.tester_id = ?', "tc.status = 'active'",
+          // Concluído mostra só o que foi concluído hoje; a partir da meia-noite o cartão sai do quadro e fica no Histórico
+          "(a.kanban_status <> 'done' OR DATE(a.done_at) = CURDATE())"];
 $params = [$uid];
 if ($fProject) { $where[] = 'tc.project_id = ?'; $params[] = $fProject; }
 
 $rows = q("SELECT a.id aid, a.kanban_status, tc.id, tc.code, tc.title, tc.priority, p.name project, s.name suite,
-                  ex.id exec_id, ex.result, ex.executed_at,
+                  ex.id exec_id, ex.result, ex.exec_type, ex.executed_at,
+                  EXISTS(SELECT 1 FROM executions x WHERE x.case_id = tc.id AND x.tester_id = a.tester_id AND x.executed_at >= a.cycle_start) has_activity,
                   (SELECT d.id FROM defects d WHERE d.case_id = tc.id AND d.status = 'retest' AND d.retest_tester_id = a.tester_id ORDER BY d.id DESC LIMIT 1) retest_defect
            FROM assignments a
            JOIN test_cases tc ON tc.id = a.case_id
@@ -26,6 +29,10 @@ foreach ($rows as $r) { $cols[$r['kanban_status']][] = $r; }
 $projects = q('SELECT DISTINCT p.id, p.name FROM projects p JOIN test_cases tc ON tc.project_id = p.id
                JOIN assignments a ON a.case_id = tc.id WHERE a.tester_id = ? ORDER BY p.name', [$uid])->fetchAll(PDO::FETCH_KEY_PAIR);
 $rank = ['critical' => 0, 'high' => 1, 'medium' => 2, 'low' => 3];
+
+// Concluídos em dias anteriores: não aparecem no quadro, só no Histórico
+$olderDone = (int)q("SELECT COUNT(*) FROM assignments a JOIN test_cases tc ON tc.id = a.case_id
+                     WHERE a.tester_id = ? AND tc.status = 'active' AND a.kanban_status = 'done' AND (a.done_at IS NULL OR DATE(a.done_at) < CURDATE())", [$uid])->fetchColumn();
 
 $pageTitle = 'Meus Testes';
 $active = 'my_tests.php';
@@ -48,7 +55,8 @@ include __DIR__ . '/includes/header.php';
             <h2><?= e($label) ?></h2>
             <span class="kb-count" data-count><?= count($cols[$status]) ?></span>
         </header>
-        <?php if ($status === 'done'): ?><p class="kb-hint">Aprovado com comentário vai direto para cá. Reprovado/Bloqueado exigem assentamento + ao menos 1 foto.</p><?php endif; ?>
+        <?php if ($status === 'done'): ?><p class="kb-hint">Aprovado com comentário vai direto para cá. Reprovado/Bloqueado exigem assentamento + ao menos 1 foto.
+            Mostra só o que foi concluído <strong>hoje</strong>: à meia-noite os cartões saem daqui e ficam no <a href="history.php">Histórico</a><?= $olderDone ? " ($olderDone já está lá)" : '' ?>.</p><?php endif; ?>
         <div class="kb-list" data-list>
             <?php foreach ($cols[$status] as $r): ?>
             <article class="kb-card lvl-<?= e($r['priority']) ?>" draggable="true" data-id="<?= (int)$r['aid'] ?>" data-rank="<?= $rank[$r['priority']] ?>" data-status="<?= e($status) ?>">
@@ -59,7 +67,8 @@ include __DIR__ . '/includes/header.php';
                 <h3><?= e($r['title']) ?></h3>
                 <p class="kb-meta"><?= e($r['project']) ?> · <?= e($r['suite']) ?></p>
                 <p class="kb-tags">
-                    <?php if ($r['result']): ?><span class="kb-res res-<?= e($r['result']) ?>">Último: <?= e(RESULTS[$r['result']]) ?></span><?php endif; ?>
+                    <?php if ($r['result']): ?><span class="kb-res res-<?= e($r['result']) ?>">Último: <?= e(RESULTS[$r['result']]) ?></span>
+                        <span class="kb-res"><?= e(EXEC_TYPES[$r['exec_type']] ?? '') ?></span><?php endif; ?>
                     <?php if ($r['retest_defect']): ?><span class="kb-res res-retest">Reteste · defeito #<?= (int)$r['retest_defect'] ?></span><?php endif; ?>
                 </p>
                 <div class="kb-actions">
@@ -73,7 +82,13 @@ include __DIR__ . '/includes/header.php';
                         <?= csrf_field() ?>
                         <input type="hidden" name="id" value="<?= (int)$r['aid'] ?>">
                         <input type="hidden" name="project" value="<?= (int)$fProject ?>">
-                        <select name="status" aria-label="Mover <?= e($r['code']) ?> para"><?= options(KANBAN_COLUMNS, $status) ?></select>
+                        <select name="status" aria-label="Mover <?= e($r['code']) ?> para">
+                            <?php foreach (KANBAN_COLUMNS as $k => $lbl):
+                                // Com atividade registrada (execução, comentário, foto) não dá para voltar para "Em aberto"
+                                $blocked = $k === 'waiting' && $r['has_activity'] && $status !== 'waiting'; ?>
+                                <option value="<?= e($k) ?>" <?= $k === $status ? 'selected' : '' ?> <?= $blocked ? 'disabled title="Já há atividade registrada neste teste"' : '' ?>><?= e($lbl) ?></option>
+                            <?php endforeach; ?>
+                        </select>
                         <button type="submit" class="kb-btn kb-btn-ghost">Mover</button>
                     </form>
                 </div>

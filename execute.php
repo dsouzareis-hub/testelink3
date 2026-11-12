@@ -24,11 +24,14 @@ if ($defectId = get_int('defect_id')) {
 if (is_post()) {
     csrf_check();
     $result = post('result');
+    $execType = post('exec_type', 'manual');
     $notes = post('notes');
     $error = null;
 
     if (!isset(RESULTS[$result])) {
         $error = 'Selecione o resultado da execução.';
+    } elseif (!isset(EXEC_TYPES[$execType])) {
+        $error = 'Selecione o tipo da execução (Manual ou Automatizado).';
     } elseif ($result !== 'passed' && $notes === '') {
         $error = 'Para resultado Reprovado ou Bloqueado, descreva o ocorrido no assentamento.';
     }
@@ -37,8 +40,8 @@ if (is_post()) {
         $pdo = db();
         $pdo->beginTransaction();
         try {
-            q('INSERT INTO executions (case_id, tester_id, result, notes, case_version) VALUES (?,?,?,?,?)',
-                [$caseId, $uid, $result, $notes ?: null, $case['version']]);
+            q('INSERT INTO executions (case_id, tester_id, result, exec_type, notes, case_version) VALUES (?,?,?,?,?,?)',
+                [$caseId, $uid, $result, $execType, $notes ?: null, $case['version']]);
             $execId = (int)$pdo->lastInsertId();
 
             // Reprovado: abre o chamado "Aguardando triagem". O tester NÃO escolhe o desenvolvedor — o Admin encaminha.
@@ -107,13 +110,19 @@ include __DIR__ . '/includes/header.php';
 <form method="post" enctype="multipart/form-data" class="card">
     <?= csrf_field() ?>
     <h2>Registrar execução</h2>
-    <div class="grid">
-        <label class="field" style="max-width:280px">Resultado
+    <div class="grid grid-2" style="max-width:640px">
+        <label class="field">Resultado
             <select name="result" required data-result-select>
                 <option value="">Selecione…</option>
                 <?= options(RESULTS, $_POST['result'] ?? null) ?>
             </select>
         </label>
+        <label class="field">Tipo
+            <select name="exec_type" required><?= options(EXEC_TYPES, $_POST['exec_type'] ?? 'manual') ?></select>
+        </label>
+    </div>
+    <div class="grid">
+
         <label class="field">Assentamento (observações do tester)
             <textarea name="notes" rows="5" placeholder="Descreva o que foi observado, dados usados, comportamento encontrado…"><?= e($_POST['notes'] ?? '') ?></textarea>
         </label>

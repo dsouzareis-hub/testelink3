@@ -38,7 +38,7 @@ include __DIR__ . '/includes/header.php';
 <?php foreach ($execs as $x): ?>
 <div class="card">
     <div class="card-head">
-        <h3>Execução #<?= (int)$x['id'] ?> — <?= e($x['tester']) ?> em <?= fmt_dt($x['executed_at']) ?> <small class="muted">(CT v<?= (int)$x['case_version'] ?>)</small></h3>
+        <h3>Execução #<?= (int)$x['id'] ?> — <?= e($x['tester']) ?> em <?= fmt_dt($x['executed_at']) ?> <small class="muted">(CT v<?= (int)$x['case_version'] ?>)</small> <small class="muted">· <?= e(EXEC_TYPES[$x['exec_type']] ?? $x['exec_type']) ?></small></h3>
         <?= result_badge($x['result']) ?>
     </div>
     <p class="pre"><strong>Assentamento:</strong> <?= e($x['notes'] ?: '—') ?></p>

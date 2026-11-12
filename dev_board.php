@@ -6,9 +6,10 @@ $uid = (int)$user['id'];
 
 $fProject = get_int('project');
 
-// Chamados que estão com o dev (abertos/em andamento) + os que ele já concluiu (ficam em Concluído, somente leitura)
+// Chamados que estão com o dev (abertos/em andamento) + os que ele concluiu HOJE (ficam em Concluído, somente leitura).
+// À meia-noite os concluídos saem do quadro e ficam apenas no Histórico (menu Histórico = lista de Defeitos).
 $where = ["((d.assigned_to = ? AND d.status IN ('open','fixing'))
-           OR EXISTS (SELECT 1 FROM defect_comments c WHERE c.defect_id = d.id AND c.user_id = ? AND c.new_status = 'fixed'))"];
+           OR EXISTS (SELECT 1 FROM defect_comments c WHERE c.defect_id = d.id AND c.user_id = ? AND c.new_status = 'fixed' AND DATE(c.created_at) = CURDATE()))"];
 $params = [$uid, $uid];
 if ($fProject) { $where[] = 'd.project_id = ?'; $params[] = $fProject; }
 
@@ -28,6 +29,11 @@ foreach ($rows as $r) {
 $projects = q("SELECT DISTINCT p.id, p.name FROM projects p JOIN defects d ON d.project_id = p.id
                WHERE d.assigned_to = ? OR EXISTS (SELECT 1 FROM defect_comments c WHERE c.defect_id = d.id AND c.user_id = ? AND c.new_status = 'fixed')
                ORDER BY p.name", [$uid, $uid])->fetchAll(PDO::FETCH_KEY_PAIR);
+
+// Concluídos por este dev em dias anteriores: fora do quadro, disponíveis no Histórico
+$olderDone = max(0, (int)q("SELECT COUNT(DISTINCT c.defect_id) FROM defect_comments c JOIN defects d ON d.id = c.defect_id
+                            WHERE c.user_id = ? AND c.new_status = 'fixed' AND NOT (d.assigned_to = ? AND d.status IN ('open','fixing'))", [$uid, $uid])->fetchColumn()
+                   - count($cols['fixed']));
 $rank = ['critical' => 0, 'high' => 1, 'medium' => 2, 'low' => 3];
 $colClass = ['open' => 'col-waiting', 'fixing' => 'col-doing', 'fixed' => 'col-done'];
 
@@ -52,7 +58,8 @@ include __DIR__ . '/includes/header.php';
             <h2><?= e($label) ?></h2>
             <span class="kb-count" data-count><?= count($cols[$status]) ?></span>
         </header>
-        <?php if ($status === 'fixed'): ?><p class="kb-hint">Solte aqui para concluir: o chamado volta ao Administrador e fica nesta coluna, somente leitura.</p><?php endif; ?>
+        <?php if ($status === 'fixed'): ?><p class="kb-hint">Solte aqui para concluir: o chamado volta ao Administrador e fica nesta coluna, somente leitura.
+            Mostra só o que foi concluído <strong>hoje</strong>: à meia-noite sai do quadro e fica no <a href="defects.php?all=1">Histórico</a><?= $olderDone ? " ($olderDone já está lá)" : '' ?>.</p><?php endif; ?>
         <div class="kb-list" data-list>
             <?php foreach ($cols[$status] as $r): $locked = !empty($r['locked']); ?>
             <article class="kb-card lvl-<?= e($r['priority']) ?><?= $locked ? ' locked' : '' ?>" <?= $locked ? '' : 'draggable="true"' ?> data-id="<?= (int)$r['id'] ?>" data-rank="<?= $rank[$r['priority']] ?>" data-status="<?= e($status) ?>">

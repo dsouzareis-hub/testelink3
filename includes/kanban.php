@@ -1,12 +1,13 @@
 <?php
 /**
  * Regras do Kanban "Meus Testes".
- * Colunas: waiting (Aguardando) → doing (Em Andamento) → done (Concluído).
+ * Colunas: waiting (Em aberto) → doing (Em Andamento) → done (Concluído).
+ * Concluído mostra apenas o que foi concluído no dia (assignments.done_at); depois da meia-noite o cartão sai do quadro e fica só no Histórico.
  * Toda alteração de status (arrastar e soltar, seletor "Mover para", POST direto) passa por kanban_move(),
  * que é onde a regra de conclusão é aplicada — não existe outro caminho que grave o status.
  */
 
-const KANBAN_COLUMNS = ['waiting' => 'Aguardando', 'doing' => 'Em Andamento', 'done' => 'Concluído'];
+const KANBAN_COLUMNS = ['waiting' => 'Em aberto', 'doing' => 'Em Andamento', 'done' => 'Concluído'];
 
 /** Rótulos de criticidade do Kanban (masculino, como pedido). */
 const KANBAN_LEVELS = ['critical' => 'Crítico', 'high' => 'Alto', 'medium' => 'Médio', 'low' => 'Baixo'];
@@ -86,26 +87,36 @@ function kanban_after_execution(int $caseId, int $testerId, string $result): str
     if ($result === 'passed') {
         $missing = kanban_missing($a);
         if (!$missing) {
-            if ($a['kanban_status'] !== 'done') {
-                q("UPDATE assignments SET kanban_status = 'done' WHERE id = ?", [$a['id']]);
-            }
+            // done_at = agora: o cartão aparece em Concluído até a meia-noite
+            q("UPDATE assignments SET kanban_status = 'done', done_at = NOW() WHERE id = ?", [$a['id']]);
             return 'Aprovado: o cartão foi movido para Concluído.';
         }
         if ($a['kanban_status'] !== 'doing') {
-            q("UPDATE assignments SET kanban_status = 'doing' WHERE id = ?", [$a['id']]);
+            q("UPDATE assignments SET kanban_status = 'doing', done_at = NULL WHERE id = ?", [$a['id']]);
         }
         return 'Aprovado registrado, mas o cartão ficou em Em Andamento: falta registrar ' . implode(' e ', $missing)
             . '. Adicione um comentário na execução para concluí-lo.';
     }
     if ($a['kanban_status'] !== 'doing') {
-        q("UPDATE assignments SET kanban_status = 'doing' WHERE id = ?", [$a['id']]);
+        q("UPDATE assignments SET kanban_status = 'doing', done_at = NULL WHERE id = ?", [$a['id']]);
     }
     return '';
 }
 
 /**
+ * Já houve atividade neste cartão no ciclo atual? (execução registrada — o que inclui resultado, tipo,
+ * assentamento, comentários e fotos). Com atividade, o cartão não pode voltar para "Em aberto".
+ */
+function kanban_has_activity(array $assignment): bool
+{
+    return (bool)q('SELECT 1 FROM executions WHERE case_id = ? AND tester_id = ? AND executed_at >= ? LIMIT 1',
+        [$assignment['case_id'], $assignment['tester_id'], $assignment['cycle_start']])->fetchColumn();
+}
+
+/**
  * Move o cartão. Retorna ['ok' => bool, 'message' => string, 'status' => status atual].
- * Aguardando → Em Andamento é livre; para Concluído exige assentamento + foto.
+ * Em aberto → Em Andamento é livre; voltar para Em aberto só sem atividade registrada;
+ * para Concluído exige assentamento (+ foto, exceto Aprovado).
  */
 function kanban_move(int $assignmentId, string $to, int $testerId): array
 {
@@ -123,6 +134,14 @@ function kanban_move(int $assignmentId, string $to, int $testerId): array
     if ($to !== 'waiting' && $a['case_status'] !== 'active') {
         return ['ok' => false, 'message' => 'Este caso de teste está inativo.', 'status' => $a['kanban_status']];
     }
+    // Depois que algo foi registrado (execução, comentário, foto), o cartão não volta para "Em aberto"
+    if ($to === 'waiting' && kanban_has_activity($a)) {
+        return [
+            'ok' => false,
+            'message' => 'Não é possível voltar para Em aberto: este teste já tem atividade registrada (execução, comentário ou foto).',
+            'status' => $a['kanban_status'],
+        ];
+    }
     if ($to === 'done') {
         $missing = kanban_missing($a);
         if ($missing) {
@@ -134,6 +153,7 @@ function kanban_move(int $assignmentId, string $to, int $testerId): array
             ];
         }
     }
-    q('UPDATE assignments SET kanban_status = ? WHERE id = ?', [$to, $assignmentId]);
+    // done_at marca quando foi concluído (Concluído só exibe o que foi concluído no dia); limpa ao sair de Concluído
+    q("UPDATE assignments SET kanban_status = ?, done_at = IF(? = 'done', NOW(), NULL) WHERE id = ?", [$to, $to, $assignmentId]);
     return ['ok' => true, 'message' => 'Movido para ' . KANBAN_COLUMNS[$to] . '.', 'status' => $to];
 }

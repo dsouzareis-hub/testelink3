@@ -14,7 +14,7 @@ if ($fFrom) { $where[] = 'ex.executed_at >= ?'; $params[] = $fFrom . ' 00:00:00'
 if ($fTo)   { $where[] = 'ex.executed_at <= ?'; $params[] = $fTo . ' 23:59:59'; }
 
 $rows = q('SELECT tc.code, tc.title, tc.priority, p.name project, s.name suite,
-                  ex.id exec_id, ex.result, ex.executed_at, u.name tester,
+                  ex.id exec_id, ex.result, ex.exec_type, ex.executed_at, u.name tester,
                   (SELECT COUNT(*) FROM defects d WHERE d.case_id = tc.id AND d.status IN (\'triage\',\'open\',\'fixing\',\'fixed\',\'retest\',\'reopened\')) open_defects
            FROM test_cases tc JOIN projects p ON p.id = tc.project_id JOIN suites s ON s.id = tc.suite_id
            LEFT JOIN executions ex ON ex.id = (SELECT MAX(id) FROM executions WHERE case_id = tc.id)
@@ -48,7 +48,7 @@ include __DIR__ . '/includes/header.php';
 
 <div class="card">
     <div class="table-wrap"><table>
-        <thead><tr><th>Código</th><th>Título</th><th>Projeto / Suíte</th><th>Prior.</th><th>Resultado</th><th>Tester</th><th>Data</th><th>Def. abertos</th></tr></thead>
+        <thead><tr><th>Código</th><th>Título</th><th>Projeto / Suíte</th><th>Prior.</th><th>Resultado</th><th>Tipo</th><th>Tester</th><th>Data</th><th>Def. abertos</th></tr></thead>
         <tbody>
         <?php foreach ($rows as $r): ?>
             <tr>
@@ -57,12 +57,13 @@ include __DIR__ . '/includes/header.php';
                 <td><?= e($r['project']) ?> / <?= e($r['suite']) ?></td>
                 <td><?= e(LEVELS[$r['priority']]) ?></td>
                 <td><?= result_badge($r['result']) ?></td>
+                <td><?= $r['exec_type'] && $r['result'] ? e(EXEC_TYPES[$r['exec_type']] ?? '') : '—' ?></td>
                 <td><?= e($r['tester'] ?: '—') ?></td>
                 <td><?= fmt_dt($r['executed_at']) ?></td>
                 <td><?= (int)$r['open_defects'] ?></td>
             </tr>
         <?php endforeach; ?>
-        <?php if (!$rows): ?><tr><td colspan="8" class="empty">Nenhum caso no filtro selecionado.</td></tr><?php endif; ?>
+        <?php if (!$rows): ?><tr><td colspan="9" class="empty">Nenhum caso no filtro selecionado.</td></tr><?php endif; ?>
         </tbody>
     </table></div>
 </div>

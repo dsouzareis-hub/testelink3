@@ -78,7 +78,7 @@ if ($type === 'execution') {
     if ($fFrom) { $where[] = 'ex.executed_at >= ?'; $params[] = $fFrom . ' 00:00:00'; }
     if ($fTo) { $where[] = 'ex.executed_at <= ?'; $params[] = $fTo . ' 23:59:59'; }
 
-    $rows = q('SELECT tc.code, tc.title, p.name project, s.name suite, ex.result, ex.executed_at, u.name tester,
+    $rows = q('SELECT tc.code, tc.title, p.name project, s.name suite, ex.result, ex.exec_type, ex.executed_at, u.name tester,
                       (SELECT COUNT(*) FROM defects d WHERE d.case_id = tc.id AND d.status IN (\'triage\',\'open\',\'fixing\',\'fixed\',\'retest\',\'reopened\')) open_defects
                FROM test_cases tc JOIN projects p ON p.id = tc.project_id JOIN suites s ON s.id = tc.suite_id
                LEFT JOIN executions ex ON ex.id = (SELECT MAX(id) FROM executions WHERE case_id = tc.id)
@@ -104,11 +104,12 @@ if ($type === 'execution') {
     $table = [];
     foreach ($rows as $r) {
         $table[] = [['t' => $r['code'], 'b' => true], $r['title'], $r['project'] . ' / ' . $r['suite'], cell_result($r['result']),
+                    $r['result'] ? (EXEC_TYPES[$r['exec_type']] ?? '') : '—',
                     $r['tester'] ?? '—', $r['executed_at'] ? fmt_dt($r['executed_at']) : '—', (string)(int)$r['open_defects']];
     }
     $pdf->table([
-        ['l' => 'Código', 'w' => 9], ['l' => 'Título', 'w' => 24], ['l' => 'Projeto / Suíte', 'w' => 19], ['l' => 'Resultado', 'w' => 12, 'a' => 'C'],
-        ['l' => 'Tester', 'w' => 12], ['l' => 'Data', 'w' => 14], ['l' => 'Def.', 'w' => 5, 'a' => 'C'],
+        ['l' => 'Código', 'w' => 9], ['l' => 'Título', 'w' => 21], ['l' => 'Projeto / Suíte', 'w' => 17], ['l' => 'Resultado', 'w' => 12, 'a' => 'C'],
+        ['l' => 'Tipo', 'w' => 10], ['l' => 'Tester', 'w' => 11], ['l' => 'Data', 'w' => 14], ['l' => 'Def.', 'w' => 5, 'a' => 'C'],
     ], $table, 7.5);
     $pdf->download($file);
 }
@@ -235,7 +236,7 @@ if ($type === 'case') {
     foreach ($execs as $x) {
         $pdf->ensure(70);
         $pdf->table([['l' => 'Execução #' . $x['id'], 'w' => 30], ['l' => 'Tester', 'w' => 22], ['l' => 'Data', 'w' => 22], ['l' => 'Resultado', 'w' => 16, 'a' => 'C']],
-            [[['t' => 'Versão do caso: v' . $x['case_version']], $x['tester'], fmt_dt($x['executed_at']), cell_result($x['result'])]], 8.5);
+            [[['t' => 'Versão do caso: v' . $x['case_version'] . ' · ' . (EXEC_TYPES[$x['exec_type']] ?? $x['exec_type'])], $x['tester'], fmt_dt($x['executed_at']), cell_result($x['result'])]], 8.5);
         $pdf->space(-4);
         $pdf->kv('Assentamento', (string)$x['notes'], 80);
         $items = [];

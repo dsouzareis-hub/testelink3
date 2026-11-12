@@ -93,7 +93,7 @@ function decide_defect(int $defectId, string $target, int $targetUserId, string 
         }
         q("UPDATE defects SET retest_tester_id = ?, priority = ?, status = 'retest' WHERE id = ?", [$targetUserId, $urgency, $defectId]);
         // O caso volta ao Kanban do tester como "Aguardando" (Reteste), iniciando um novo ciclo de execução
-        q("UPDATE assignments SET kanban_status = 'waiting', cycle_start = NOW() WHERE case_id = ? AND tester_id = ?", [$d['case_id'], $targetUserId]);
+        q("UPDATE assignments SET kanban_status = 'waiting', cycle_start = NOW(), done_at = NULL WHERE case_id = ? AND tester_id = ?", [$d['case_id'], $targetUserId]);
         add_defect_comment($defectId, $adminId, 'Decisão do Administrador: enviado ao tester ' . $testers[$targetUserId] . ' para reteste — urgência ' . LEVELS[$urgency] . '.',
             $d['status'], 'retest');
         return;

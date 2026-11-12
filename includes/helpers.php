@@ -99,6 +99,8 @@ const ROLES = [
     'viewer'    => 'Usuário (leitura)',
 ];
 const RESULTS = ['passed' => 'Aprovado', 'failed' => 'Reprovado', 'blocked' => 'Bloqueado'];
+/** Tipo da execução: feita à mão ou por automação. */
+const EXEC_TYPES = ['manual' => 'Manual', 'automated' => 'Automatizado'];
 const LEVELS = ['low' => 'Baixa', 'medium' => 'Média', 'high' => 'Alta', 'critical' => 'Crítica'];
 const DEFECT_STATUS = [
     'triage' => 'Aguardando triagem', 'open' => 'Aberto', 'fixing' => 'Em andamento',
@@ -235,7 +237,7 @@ function nav_items(string $role): array
         case 'tester':
             return [$dash, ['my_tests.php', 'Meus Testes', 'play'], ['history.php', 'Histórico', 'clock'], $defects, $profile];
         case 'developer':
-            return [$dash, ['dev_board.php', 'Meus Chamados', 'bug'], $profile];
+            return [$dash, ['dev_board.php', 'Meus Chamados', 'bug'], ['defects.php?all=1', 'Histórico', 'clock'], $profile];
         default: // viewer
             return [$dash, ['cases.php', 'Casos de Teste', 'clipboard'], ['history.php', 'Execuções', 'clock'], $defects, $reports, $profile];
     }

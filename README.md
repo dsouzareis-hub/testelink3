@@ -93,19 +93,21 @@ A função *Administrador* não pode ser solicitada no formulário; só o admin 
 
 ## Kanban "Meus Testes" (perfil Tester)
 
-A tela Meus Testes é um quadro Kanban escuro (preto/grafite com vermelho) com as colunas **Aguardando**, **Em Andamento** e **Concluído**.
+A tela Meus Testes é um quadro Kanban escuro (preto/grafite com vermelho) com as colunas **Em aberto**, **Em Andamento** e **Concluído**.
 
 - **Arrastar e soltar** os cartões entre colunas; o status é gravado na hora. Cada cartão também tem o seletor *Mover para* (teclado/toque/sem JavaScript).
-- **Aguardando → Em Andamento**: livre. Registrar uma execução também move o cartão para Em Andamento.
+- **Em aberto → Em Andamento**: livre. Registrar uma execução também move o cartão para Em Andamento.
+- **Voltar para Em aberto**: só é permitido enquanto não houver atividade registrada (execução, comentário ou foto). Com atividade, o sistema bloqueia (arrastar, seletor ou POST) e a opção fica desativada.
+- **Concluído é do dia**: mostra apenas o que foi concluído hoje; à meia-noite os cartões saem do quadro e ficam só no **Histórico** (vale também para o Kanban do desenvolvedor, cujo histórico é a lista de Defeitos com Mostrar Tudo).
 - **Aprovado + comentário (assentamento)**: ao salvar a execução, o cartão **vai sozinho para Concluído** e fica visível ali. A foto é opcional nesse caso. Aprovado sem comentário fica em Em Andamento e avisa o que falta; adicionar um comentário depois conclui o cartão.
 - **Comentários depois de concluído**: na tela da execução (botão *Comentar* no cartão) o tester continua adicionando comentários e fotos normalmente.
 - **Reprovado ou Bloqueado**: o cartão fica em Em Andamento. Para concluir (arrastando ou pelo seletor) é preciso **assentamento** *e* **ao menos uma foto de evidência**. Reexecutar um cartão concluído como Reprovado tira-o de Concluído.
 - **→ Concluído** (qualquer forma): a regra acima é validada no servidor.
   A mensagem diz o que falta. A regra é aplicada no servidor (`includes/kanban.php`), valendo para arrastar, seletor ou POST direto.
-- Quando um defeito do caso é marcado como **Corrigido**, o cartão volta para Aguardando (reteste) e começa um novo ciclo.
+- Quando um defeito do caso é marcado como **Corrigido**, o cartão volta para Em aberto (reteste) e começa um novo ciclo.
 - **Criticidade** (prioridade do caso) em etiquetas vermelhas de intensidade crescente: Baixo < Médio < Alto < Crítico (o mais vibrante, com brilho).
 
-> Já instalou antes? Execute uma vez, nesta ordem, `migration_registro.sql`, `migration_kanban.sql`, `migration_fluxo.sql`, `migration_decisao.sql` e `migration_comentarios.sql` no banco `testlink3` (nenhuma apaga dados).
+> Já instalou antes? Execute uma vez, nesta ordem, `migration_registro.sql`, `migration_kanban.sql`, `migration_fluxo.sql`, `migration_decisao.sql`, `migration_comentarios.sql` e `migration_tipo_concluido.sql` no banco `testlink3` (nenhuma apaga dados).
 > Para rodar testes sem tocar no seu banco, aponte para outro com a variável de ambiente `TESTLINK_DB`.
 
 ## Relatórios
@@ -137,3 +139,7 @@ Para produção, use HTTPS, desative `display_errors` no `php.ini` e mantenha `u
 
 - O sistema funciona offline: não há dependências externas (ícones em SVG inline).
 - O limite de upload efetivo é o menor entre *Configurações → tamanho máximo* e `upload_max_filesize`/`post_max_size` do `php.ini`.
+
+## Tipo da execução
+
+Ao registrar uma execução o tester informa o **Resultado** (Aprovado, Reprovado, Bloqueado) e o **Tipo** (**Manual** ou **Automatizado**). O tipo aparece na tela da execução, no histórico, no cartão do Kanban e nos relatórios (tela e PDF).

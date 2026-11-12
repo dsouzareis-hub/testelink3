@@ -65,6 +65,7 @@ include __DIR__ . '/includes/header.php';
         <dt>Projeto / Suíte</dt><dd><?= e($ex['project']) ?> / <?= e($ex['suite']) ?></dd>
         <dt>Tester</dt><dd><?= e($ex['tester']) ?></dd>
         <dt>Data</dt><dd><?= fmt_dt($ex['executed_at']) ?></dd>
+        <dt>Tipo</dt><dd><?= badge(EXEC_TYPES[$ex['exec_type']] ?? $ex['exec_type'], $ex['exec_type'] === 'automated' ? 'purple' : 'blue') ?></dd>
         <dt>Versão do CT</dt><dd>v<?= (int)$ex['case_version'] ?></dd>
         <dt>Assentamento</dt><dd class="pre"><?= e($ex['notes'] ?: '—') ?></dd>
         <dt>Evidências</dt><dd><?= evidence_gallery($evidences) ?></dd>

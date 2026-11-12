@@ -95,6 +95,8 @@ CREATE TABLE assignments (
     -- Kanban do tester: coluna atual do cartão e início do ciclo atual (volta a "waiting" quando um defeito é corrigido)
     kanban_status ENUM('waiting','doing','done') NOT NULL DEFAULT 'waiting',
     cycle_start   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- Quando o cartão foi concluído: a coluna Concluído só mostra o que foi concluído no dia (depois, só no Histórico)
+    done_at       DATETIME NULL,
     UNIQUE KEY uq_assignment (case_id, tester_id),
     FOREIGN KEY (case_id)     REFERENCES test_cases(id) ON DELETE CASCADE,
     FOREIGN KEY (tester_id)   REFERENCES users(id)      ON DELETE CASCADE,
@@ -107,6 +109,7 @@ CREATE TABLE executions (
     case_id      INT UNSIGNED NOT NULL,
     tester_id    INT UNSIGNED NOT NULL,
     result       ENUM('passed','failed','blocked') NOT NULL,
+    exec_type    ENUM('manual','automated') NOT NULL DEFAULT 'manual',
     notes        TEXT NULL,
     case_version INT UNSIGNED NOT NULL DEFAULT 1,
     executed_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

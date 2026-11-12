@@ -28,7 +28,7 @@ $sys = get_setting('system_name', APP_NAME);
         </a>
         <nav>
             <?php foreach (nav_items($user['role']) as [$file, $label, $ico]): ?>
-                <a href="<?= e($file) ?>" class="<?= $active === $file ? 'active' : '' ?>">
+                <a href="<?= e($file) ?>" class="<?= $active === strtok($file, '?') ? 'active' : '' ?>">
                     <?= icon($ico) ?> <span><?= e($label) ?></span>
                 </a>
             <?php endforeach; ?>
