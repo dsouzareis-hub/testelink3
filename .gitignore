@@ -1,0 +1,11 @@
+# Arquivos enviados pelos usuários (evidências e logo) não vão para o repositório
+uploads/evidences/*
+uploads/logo/*
+!uploads/.htaccess
+!uploads/evidences/.gitkeep
+# Fontes proprietárias copiadas pelo usuário para o PDF
+assets/fonts/*.ttf
+# Sistema/editor
+.DS_Store
+Thumbs.db
+*.log
