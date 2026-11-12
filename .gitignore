@@ -9,3 +9,6 @@ assets/fonts/*.ttf
 .DS_Store
 Thumbs.db
 *.log
+# Lixeira (fotos de itens excluídos) e backups do banco: dados reais, nunca vão para o repositório
+uploads/trash/*
+backups/

@@ -239,6 +239,9 @@ if ($type === 'case') {
             [[['t' => 'Versão do caso: v' . $x['case_version'] . ' · ' . (EXEC_TYPES[$x['exec_type']] ?? $x['exec_type'])], $x['tester'], fmt_dt($x['executed_at']), cell_result($x['result'])]], 8.5);
         $pdf->space(-4);
         $pdf->kv('Assentamento', (string)$x['notes'], 80);
+        if ($failedSteps = execution_failed_steps((int)$x['id'])) {
+            $pdf->kv('Passo(s) com falha', implode("\n", array_map(fn($s) => 'Passo ' . $s['step_no'] . ' — ' . $s['step_text'], $failedSteps)), 80);
+        }
         $items = [];
         foreach (execution_evidences((int)$x['id']) as $ev) {
             $row = q('SELECT stored_name FROM evidences WHERE id = ?', [$ev['id']])->fetchColumn();

@@ -45,6 +45,7 @@ if (is_post()) {
     /* ---- Admin: fechar o chamado ---- */
     if ($isAdmin && $action === 'close') {
         set_defect_status($id, 'closed', $uid, 'Chamado fechado pelo Administrador.');
+        audit('chamado_fechado', 'defect', $id, '[' . $d['code'] . '] ' . $d['title']);
         flash('success', 'Chamado fechado.');
         redirect('defect_view.php?id=' . $id);
     }
@@ -135,6 +136,7 @@ include __DIR__ . '/includes/header.php';
         <dt>Autor Adm</dt><dd><?= $d['case_author'] ? '<strong>' . e($d['case_author']) . '</strong> <span class="muted">· criou o caso de teste ' . e($d['code']) . '</span>' : '<span class="muted">—</span>' ?></dd>
         <?php if ($retestTester && $d['status'] === 'retest'): ?><dt>Reteste com</dt><dd><?= e($retestTester) ?></dd><?php endif; ?>
         <dt>Relato do tester</dt><dd class="pre"><?= e($d['description']) ?></dd>
+        <?php if ($failedSteps = execution_failed_steps((int)$d['execution_id'])): ?><dt>Passo(s) com falha</dt><dd><?= failed_steps_html($failedSteps) ?></dd><?php endif; ?>
         <dt>Evidências do teste</dt><dd><?= evidence_gallery($evidences) ?></dd>
     </dl>
 </div>
@@ -213,6 +215,7 @@ include __DIR__ . '/includes/header.php';
         </label>
         <label class="field">Fotos (JPG, PNG ou WEBP — até <?= (int)(max_upload_bytes() / 1048576) ?> MB cada)
             <input type="file" name="photos[]" accept="image/jpeg,image/png,image/webp" multiple data-preview-input>
+            <span class="paste-hint"><?= icon('upload', 16) ?> Dica: tire um print e cole aqui direto com <kbd>Ctrl</kbd>+<kbd>V</kbd> — sem precisar salvar o arquivo.</span>
         </label>
         <div class="gallery preview-list" data-preview-box></div>
     </div>

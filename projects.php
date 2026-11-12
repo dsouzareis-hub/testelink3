@@ -17,16 +17,17 @@ if (is_post()) {
         }
         if ($id) {
             q('UPDATE projects SET name=?, description=?, status=? WHERE id=?', [$name, $desc, $status, $id]);
+            audit('projeto_editado', 'project', $id, $name);
             flash('success', 'Projeto atualizado.');
         } else {
             q('INSERT INTO projects (name, description, status, created_by) VALUES (?,?,?,?)', [$name, $desc, $status, $me['id']]);
+            audit('projeto_criado', 'project', (int)db()->lastInsertId(), $name);
             flash('success', 'Projeto criado.');
         }
     } elseif ($action === 'delete' && $id) {
-        $caseIds = q('SELECT id FROM test_cases WHERE project_id = ?', [$id])->fetchAll(PDO::FETCH_COLUMN);
-        purge_evidence_files($caseIds);
-        q('DELETE FROM projects WHERE id = ?', [$id]);
-        flash('success', 'Projeto excluído com suítes, casos, execuções e defeitos.');
+        // Vai para a Lixeira (com suítes, casos, execuções, defeitos e fotos) e pode ser restaurado
+        $ok = trash_delete_project($id, (int)$me['id']);
+        flash($ok ? 'success' : 'error', $ok ? 'Projeto enviado para a Lixeira, com suítes, casos, execuções e defeitos. Dá para restaurar em Lixeira.' : 'Projeto não encontrado.');
     }
     redirect('projects.php');
 }
@@ -83,7 +84,7 @@ if ($showForm):
                 <td><?= $p['status'] === 'active' ? badge('Ativo', 'green') : badge('Arquivado', 'gray') ?></td>
                 <td class="actions">
                     <a class="btn btn-sm btn-ghost" href="projects.php?edit=<?= (int)$p['id'] ?>"><?= icon('edit', 14) ?> Editar</a>
-                    <form method="post" class="inline-form" data-confirm="O projeto e TODOS os seus casos, execuções e defeitos serão excluídos. Esta ação não pode ser desfeita." data-confirm-title="Excluir projeto?" data-confirm-ok="Sim, excluir" data-confirm-type="danger">
+                    <form method="post" class="inline-form" data-confirm="O projeto, suas suítes, casos, execuções e defeitos vão para a Lixeira. Você poderá restaurar tudo depois." data-confirm-title="Enviar projeto para a lixeira?" data-confirm-ok="Enviar para a lixeira" data-confirm-type="warning">
                         <?= csrf_field() ?><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
                         <button class="btn btn-sm btn-danger" type="submit"><?= icon('trash', 14) ?></button>
                     </form>

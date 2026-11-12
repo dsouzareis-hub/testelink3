@@ -147,43 +147,176 @@
         setTimeout(function () { a.style.display = 'none'; }, 6000);
     });
 
-    // Bloco "Encaminhar ao desenvolvedor" só aparece quando o resultado é Reprovado
+    // Execução: o bloco "em qual passo falhou?" só aparece quando o resultado é Reprovado
     var result = document.querySelector('[data-result-select]');
-    var box = document.getElementById('forward-box');
-    var forwardChk = document.querySelector('[data-forward-check]');
-    if (result && box) {
-        var syncForward = function () {
+    var failedBox = document.querySelector('[data-failed-steps]');
+    if (result && failedBox) {
+        var syncFailed = function () {
             var failed = result.value === 'failed';
-            if (forwardChk) {
-                forwardChk.closest('.forward-toggle').hidden = !failed;
-                box.hidden = !(failed && forwardChk.checked);
-            } else {
-                box.hidden = !failed;
-            }
+            failedBox.hidden = !failed;
+            failedBox.querySelectorAll('input').forEach(function (i) { i.disabled = !failed; });   // oculto = não envia
         };
-        result.addEventListener('change', syncForward);
-        if (forwardChk) { forwardChk.addEventListener('change', syncForward); }
-        syncForward();
+        result.addEventListener('change', syncFailed);
+        syncFailed();
     }
 
-    // Pré-visualização das imagens selecionadas
+    // Imagens: escolher arquivos OU COLAR PRINT direto (Ctrl+V). Mostra miniaturas com opção de remover.
     var fileInput = document.querySelector('[data-preview-input]');
     var previewBox = document.querySelector('[data-preview-box]');
-    if (fileInput && previewBox) {
-        fileInput.addEventListener('change', function () {
+    if (fileInput) {
+        var picked = [];                    // arquivos efetivamente anexados (escolhidos + colados)
+        var MAX_IMAGES = 10;
+        var urls = [];
+        var pasteCount = 0;
+
+        var syncInput = function () {
+            // Reescreve a lista de arquivos do <input> para o que está em "picked" (é o que o formulário envia)
+            try {
+                var dt = new DataTransfer();
+                picked.forEach(function (f) { dt.items.add(f); });
+                fileInput.files = dt.files;
+            } catch (e) { /* navegador sem suporte: mantém só a seleção nativa */ }
+            renderPreview();
+        };
+
+        var renderPreview = function () {
+            if (!previewBox) { return; }
+            urls.forEach(function (u) { URL.revokeObjectURL(u); });
+            urls = [];
             previewBox.innerHTML = '';
-            Array.prototype.forEach.call(fileInput.files, function (f) {
-                if (!/^image\/(jpeg|png|webp)$/.test(f.type)) { return; }
-                var a = document.createElement('span');
-                a.className = 'thumb';
+            picked.forEach(function (f, idx) {
+                var wrap = document.createElement('span');
+                wrap.className = 'thumb thumb-new';
                 var img = document.createElement('img');
+                var u = URL.createObjectURL(f);
+                urls.push(u);
+                img.src = u;
                 img.alt = f.name;
-                img.src = URL.createObjectURL(f);
-                a.appendChild(img);
-                previewBox.appendChild(a);
+                img.title = f.name;
+                var x = document.createElement('button');
+                x.type = 'button';
+                x.className = 'thumb-x';
+                x.setAttribute('aria-label', 'Remover imagem');
+                x.textContent = '×';
+                x.addEventListener('click', function () { picked.splice(idx, 1); syncInput(); });
+                wrap.appendChild(img);
+                wrap.appendChild(x);
+                previewBox.appendChild(wrap);
             });
+        };
+
+        var addFiles = function (files) {
+            var skipped = 0;
+            Array.prototype.forEach.call(files, function (f) {
+                if (!/^image\/(jpeg|png|webp)$/.test(f.type)) { skipped++; return; }
+                if (picked.length >= MAX_IMAGES) { skipped++; return; }
+                picked.push(f);
+            });
+            syncInput();
+            if (skipped) {
+                window.TL.alert({ type: 'warning', title: 'Alguns arquivos não foram adicionados',
+                    message: 'Só são aceitas imagens JPG, PNG ou WEBP, até ' + MAX_IMAGES + ' por envio.' });
+            }
+        };
+
+        // Escolha pelo botão "Escolher arquivos": soma ao que já existe (inclusive prints colados)
+        fileInput.addEventListener('change', function () {
+            if (fileInput.dataset.syncing) { return; }
+            addFiles(Array.prototype.slice.call(fileInput.files));
+        });
+        // Evita reprocessar a mudança feita por nós mesmos
+        var origSync = syncInput;
+        syncInput = function () { fileInput.dataset.syncing = '1'; origSync(); setTimeout(function () { delete fileInput.dataset.syncing; }, 0); };
+
+        // COLAR (Ctrl+V): imagem na área de transferência (print) vira anexo, sem salvar arquivo
+        document.addEventListener('paste', function (ev) {
+            var items = ev.clipboardData && ev.clipboardData.items;
+            if (!items) { return; }
+            var imgs = [];
+            var hasText = false;
+            Array.prototype.forEach.call(items, function (it) {
+                if (it.kind === 'file' && /^image\//.test(it.type)) { imgs.push(it.getAsFile()); }
+                if (it.kind === 'string' && it.type === 'text/plain') { hasText = true; }
+            });
+            if (!imgs.length || (hasText && /^(INPUT|TEXTAREA)$/.test((ev.target || {}).tagName || ''))) { return; }   // texto normal segue o fluxo padrão
+            ev.preventDefault();
+            var stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
+            var named = imgs.map(function (f, i) {
+                var ext = (f.type.split('/')[1] || 'png').replace('jpeg', 'jpg');
+                pasteCount++;                                   // número sequencial: nomes nunca se repetem
+                return new File([f], 'print-' + stamp + '-' + pasteCount + '.' + ext, { type: f.type });
+            });
+            addFiles(named);
+            fileInput.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
         });
     }
+
+    // Editor de passos em tópicos: digitar + Enter cria o próximo passo
+    document.querySelectorAll('[data-steps-editor]').forEach(function (list) {
+        var addBtn = document.querySelector('[data-step-add]');
+        function rows() { return Array.prototype.slice.call(list.querySelectorAll('.step-row')); }
+        function renumber() { rows().forEach(function (r, i) { r.querySelector('.step-no').textContent = (i + 1) + '.'; }); }
+        function makeRow(text) {
+            var li = document.createElement('li');
+            li.className = 'step-row';
+            li.innerHTML = '<span class="step-box" aria-hidden="true"></span><span class="step-no"></span>' +
+                '<input type="text" name="steps[]" maxlength="500" autocomplete="off" placeholder="Descreva o passo e aperte Enter">' +
+                '<button type="button" class="step-del" aria-label="Remover passo" title="Remover passo">×</button>';
+            li.querySelector('input').value = text || '';
+            return li;
+        }
+        function addAfter(row, text) {
+            var li = makeRow(text);
+            if (row && row.nextSibling) { list.insertBefore(li, row.nextSibling); } else { list.appendChild(li); }
+            renumber();
+            li.querySelector('input').focus();
+            return li;
+        }
+        function removeRow(row) {
+            var all = rows();
+            if (all.length <= 1) { row.querySelector('input').value = ''; row.querySelector('input').focus(); return; }
+            var prev = row.previousElementSibling || row.nextElementSibling;
+            row.remove();
+            renumber();
+            if (prev) { prev.querySelector('input').focus(); }
+        }
+
+        list.addEventListener('keydown', function (ev) {
+            var input = ev.target.closest('input');
+            if (!input) { return; }
+            var row = input.closest('.step-row');
+            if (ev.key === 'Enter') {
+                ev.preventDefault();                                  // não envia o formulário
+                if (input.value.trim() !== '' || rows().length === 1) { addAfter(row); }
+                else { input.focus(); }                               // linha vazia + Enter: não cria outra vazia
+            } else if (ev.key === 'Backspace' && input.value === '' && rows().length > 1) {
+                ev.preventDefault();
+                removeRow(row);
+            } else if (ev.key === 'ArrowDown' && row.nextElementSibling) {
+                ev.preventDefault();
+                row.nextElementSibling.querySelector('input').focus();
+            } else if (ev.key === 'ArrowUp' && row.previousElementSibling) {
+                ev.preventDefault();
+                row.previousElementSibling.querySelector('input').focus();
+            }
+        });
+        // Colar várias linhas de uma vez: cada linha vira um passo
+        list.addEventListener('paste', function (ev) {
+            var input = ev.target.closest('input');
+            var text = ev.clipboardData && ev.clipboardData.getData('text');
+            if (!input || !text || !/\r?\n/.test(text.trim())) { return; }
+            ev.preventDefault();
+            var lines = text.split(/\r?\n/).map(function (s) { return s.replace(/^\s*(\d+[.)-]\s*|[-*•]\s*)/, '').trim(); }).filter(Boolean);
+            var row = input.closest('.step-row');
+            if (input.value.trim() === '') { input.value = lines.shift() || ''; }
+            lines.forEach(function (l) { row = addAfter(row, l); });
+        });
+        list.addEventListener('click', function (ev) {
+            var del = ev.target.closest('.step-del');
+            if (del) { removeRow(del.closest('.step-row')); }
+        });
+        if (addBtn) { addBtn.addEventListener('click', function () { addAfter(rows().slice(-1)[0]); }); }
+    });
 
     // Select de suíte dependente do projeto (data-project em cada <option>)
     var projSel = document.querySelector('[data-project-select]');

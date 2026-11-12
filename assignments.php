@@ -17,15 +17,35 @@ if (is_post()) {
             flash('error', 'Selecione ao menos um caso e um tester.');
         } else {
             $n = 0;
+            $newCases = [];
             foreach ($caseIds as $cid) {
                 $st = q('INSERT IGNORE INTO assignments (case_id, tester_id, assigned_by)
                          SELECT id, ?, ? FROM test_cases WHERE id = ?', [$testerId, $me['id'], $cid]);
-                $n += $st->rowCount();
+                if ($st->rowCount()) {
+                    $n++;
+                    $newCases[$cid] = (string)q('SELECT code FROM test_cases WHERE id = ?', [$cid])->fetchColumn();
+                }
+            }
+            if ($n) {
+                audit('atribuicao', 'user', $testerId, $n . ' caso(s) para ' . $testers[$testerId] . ': ' . implode(', ', array_slice($newCases, 0, 15)));
+                // O tester precisa executar: avisa (um aviso por caso, que some quando ele executar; muitos casos viram um aviso só)
+                if ($n <= 5) {
+                    foreach ($newCases as $cid => $code) {
+                        notify($testerId, 'Caso ' . $code . ' atribuído a você para execução.', 'case_view.php?id=' . $cid, 'assign:' . $cid);
+                    }
+                } else {
+                    notify($testerId, $n . ' casos atribuídos a você para execução (' . implode(', ', array_slice($newCases, 0, 4)) . '…).', 'my_tests.php');
+                }
             }
             flash('success', "$n atribuição(ões) criada(s) para {$testers[$testerId]}.");
         }
     } elseif ($action === 'unassign') {
+        $a = q('SELECT a.case_id, a.tester_id, tc.code FROM assignments a JOIN test_cases tc ON tc.id = a.case_id WHERE a.id = ?', [post_int('id')])->fetch();
         q('DELETE FROM assignments WHERE id = ?', [post_int('id')]);
+        if ($a) {
+            notify_resolve('assign:' . $a['case_id'], (int)$a['tester_id']);       // não há mais o que executar
+            audit('atribuicao_removida', 'case', (int)$a['case_id'], $a['code']);
+        }
         flash('success', 'Atribuição removida.');
     }
     redirect('assignments.php' . ($projectId ? '?project=' . $projectId : ''));

@@ -39,10 +39,12 @@ if (is_post()) {
             if ($password !== '') {
                 q('UPDATE users SET password_hash=? WHERE id=?', [password_hash($password, PASSWORD_DEFAULT), $id]);
             }
+            audit('usuario_editado', 'user', $id, $name . ' — ' . ROLES[$role] . ($active ? '' : ' (inativo)') . ($password !== '' ? ' — senha redefinida' : ''));
             flash('success', 'Usuário atualizado.');
         } else {
             q('INSERT INTO users (name, email, password_hash, role, active) VALUES (?,?,?,?,?)',
                 [$name, $email, password_hash($password, PASSWORD_DEFAULT), $role, $active]);
+            audit('usuario_criado', 'user', (int)db()->lastInsertId(), $name . ' <' . $email . '> — ' . ROLES[$role]);
             flash('success', 'Usuário criado.');
         }
     } elseif ($action === 'approve' && $id) {
@@ -52,28 +54,38 @@ if (is_post()) {
             flash('error', 'Função inválida.');
         } else {
             $n = q("UPDATE users SET status = 'approved', active = 1, role = ? WHERE id = ? AND status = 'pending'", [$role, $id])->rowCount();
+            if ($n) {
+                notify_resolve('user:' . $id);                      // a ação foi feita: baixa o aviso de todos os admins
+                audit('cadastro_aprovado', 'user', $id, 'Função: ' . ROLES[$role]);
+            }
             flash($n ? 'success' : 'error', $n ? 'Cadastro aprovado. O usuário já pode entrar.' : 'Solicitação não encontrada.');
         }
     } elseif ($action === 'reject' && $id) {
         $n = q("UPDATE users SET status = 'rejected', active = 0 WHERE id = ? AND status = 'pending'", [$id])->rowCount();
+        if ($n) {
+            notify_resolve('user:' . $id);
+            audit('cadastro_recusado', 'user', $id);
+        }
         flash($n ? 'success' : 'error', $n ? 'Solicitação recusada.' : 'Solicitação não encontrada.');
     } elseif ($action === 'toggle' && $id && $id !== (int)$me['id']) {
         q("UPDATE users SET active = 1 - active WHERE id = ? AND status = 'approved'", [$id]);
+        audit('usuario_status', 'user', $id);
         flash('success', 'Status do usuário alterado.');
     } elseif ($action === 'delete' && $id && $id !== (int)$me['id']) {
-        // Remove também as evidências em disco das execuções do usuário
-        $caseIds = q('SELECT DISTINCT case_id FROM executions WHERE tester_id = ?', [$id])->fetchAll(PDO::FETCH_COLUMN);
-        $files = [];
-        if ($caseIds) {
-            $files = q('SELECT ev.stored_name FROM evidences ev JOIN executions ex ON ex.id = ev.execution_id WHERE ex.tester_id = ?', [$id])
-                ->fetchAll(PDO::FETCH_COLUMN);
-        }
-        try {
+        // Proteção contra perda: quem já tem histórico (execuções, chamados, comentários) NÃO pode ser excluído, só desativado,
+        // porque a exclusão apagaria esse histórico junto.
+        $hist = (int)q('SELECT (SELECT COUNT(*) FROM executions WHERE tester_id = ?)
+                      + (SELECT COUNT(*) FROM execution_comments WHERE user_id = ?)
+                      + (SELECT COUNT(*) FROM defects WHERE reported_by = ? OR assigned_to = ? OR retest_tester_id = ?)
+                      + (SELECT COUNT(*) FROM defect_comments WHERE user_id = ?)
+                      + (SELECT COUNT(*) FROM defect_attachments WHERE user_id = ?)', array_fill(0, 7, $id))->fetchColumn();
+        $victim = q('SELECT name, email FROM users WHERE id = ?', [$id])->fetch();
+        if ($hist > 0) {
+            flash('error', 'Este usuário tem histórico no sistema (execuções, chamados ou comentários) e não pode ser excluído sem perder esses registros. Use "Desativar".');
+        } elseif ($victim) {
             q('DELETE FROM users WHERE id = ?', [$id]);
-            foreach ($files as $f) { @unlink(UPLOAD_DIR . basename($f)); }
-            flash('success', 'Usuário excluído (suas execuções e defeitos vinculados também foram removidos).');
-        } catch (PDOException $e) {
-            flash('error', 'Não foi possível excluir. Prefira desativar o usuário.');
+            audit('usuario_excluido', 'user', $id, $victim['name'] . ' <' . $victim['email'] . '>');
+            flash('success', 'Usuário excluído.');
         }
     }
     redirect('users.php');
@@ -170,7 +182,7 @@ if ($showForm):
                         <button class="btn btn-sm btn-ghost" type="submit"><?= $u['active'] ? 'Desativar' : 'Ativar' ?></button>
                     </form>
                     <?php endif; ?>
-                    <form method="post" class="inline-form" data-confirm="Execuções e defeitos deste usuário também serão removidos. Se for só bloquear o acesso, prefira desativar." data-confirm-title="Excluir usuário?" data-confirm-ok="Sim, excluir" data-confirm-type="danger">
+                    <form method="post" class="inline-form" data-confirm="O usuário será excluído. Quem já tem histórico (execuções, chamados ou comentários) não pode ser excluído — nesse caso use Desativar." data-confirm-title="Excluir usuário?" data-confirm-ok="Sim, excluir" data-confirm-type="danger">
                         <?= csrf_field() ?><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= (int)$u['id'] ?>">
                         <button class="btn btn-sm btn-danger" type="submit"><?= icon('trash', 14) ?></button>
                     </form>

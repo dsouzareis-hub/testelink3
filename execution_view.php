@@ -69,6 +69,7 @@ include __DIR__ . '/includes/header.php';
         <dt>Tipo</dt><dd><?= badge(EXEC_TYPES[$ex['exec_type']] ?? $ex['exec_type'], $ex['exec_type'] === 'automated' ? 'purple' : 'blue') ?></dd>
         <dt>Versão do CT</dt><dd>v<?= (int)$ex['case_version'] ?></dd>
         <dt>Assentamento</dt><dd class="pre"><?= e($ex['notes'] ?: '—') ?></dd>
+        <?php if ($failedSteps = execution_failed_steps($id)): ?><dt>Passo(s) com falha</dt><dd><?= failed_steps_html($failedSteps) ?></dd><?php endif; ?>
         <dt>Evidências</dt><dd><?= evidence_gallery($evidences) ?></dd>
         <dt>Defeito</dt>
         <dd><?= $defect
@@ -100,6 +101,7 @@ include __DIR__ . '/includes/header.php';
             </label>
             <label class="field">Fotos (JPG, PNG ou WEBP — até <?= (int)(max_upload_bytes() / 1048576) ?> MB cada)
                 <input type="file" name="evidences[]" accept="image/jpeg,image/png,image/webp" multiple data-preview-input>
+                <span class="paste-hint"><?= icon('upload', 16) ?> Dica: tire um print e cole aqui direto com <kbd>Ctrl</kbd>+<kbd>V</kbd> — sem precisar salvar o arquivo.</span>
             </label>
             <div class="gallery preview-list" data-preview-box></div>
         </div>

@@ -171,6 +171,27 @@ function users_by_role(string $role): array
         ->fetchAll(PDO::FETCH_KEY_PAIR);
 }
 
+/** Passos em tópicos: lê o array steps[] do formulário e devolve um texto com um passo por linha. */
+function steps_from_post(string $key = 'steps'): string
+{
+    $arr = $_POST[$key] ?? [];
+    $arr = is_array($arr) ? $arr : [$arr];
+    $out = [];
+    foreach ($arr as $s) {
+        $s = trim((string)preg_replace('/\s+/u', ' ', (string)$s));
+        if ($s !== '') {
+            $out[] = mb_substr($s, 0, 500);
+        }
+    }
+    return implode("\n", $out);
+}
+
+/** Texto de passos (um por linha) → lista de passos não vazios. */
+function steps_list(string $text): array
+{
+    return array_values(array_filter(array_map('trim', preg_split('/\R/', $text) ?: []), 'strlen'));
+}
+
 /** Percentual seguro (evita divisão por zero). */
 function pct(int $part, int $total): int
 {
@@ -203,6 +224,9 @@ function icon(string $name, int $size = 18): string
         'eye'      => '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
         'upload'   => '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>',
         'download' => '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
+        'bell'     => '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
+        'shield'   => '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+        'database' => '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>',
         'arrow-left' => '<line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>',
         'clock'    => '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
     ];
@@ -232,6 +256,9 @@ function nav_items(string $role): array
                 $defects,
                 $reports,
                 ['users.php', 'Usuários', 'users'],
+                ['trash.php', 'Lixeira', 'trash'],
+                ['audit.php', 'Auditoria', 'shield'],
+                ['backups.php', 'Backups', 'database'],
                 ['settings.php', 'Configurações', 'settings'],
                 $profile,
             ];

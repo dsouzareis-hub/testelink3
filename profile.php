@@ -17,6 +17,7 @@ if (is_post()) {
         flash('error', 'A confirmação não confere com a nova senha.');
     } else {
         q('UPDATE users SET password_hash = ? WHERE id = ?', [password_hash($new, PASSWORD_DEFAULT), $user['id']]);
+        audit('senha_alterada', 'user', (int)$user['id']);
         session_regenerate_id(true);
         flash('success', 'Senha alterada com sucesso.');
     }

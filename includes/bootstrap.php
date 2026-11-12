@@ -23,4 +23,8 @@ require __DIR__ . '/db.php';
 require __DIR__ . '/helpers.php';
 require __DIR__ . '/auth.php';
 require __DIR__ . '/upload.php';
+require __DIR__ . '/notify.php';
+require __DIR__ . '/audit.php';
+require __DIR__ . '/trash.php';
+require __DIR__ . '/backup.php';
 require __DIR__ . '/defects_lib.php';

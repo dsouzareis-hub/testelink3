@@ -37,6 +37,10 @@ if (is_post()) {
         // Fica inativo e pendente até o administrador aprovar
         q('INSERT INTO users (name, email, password_hash, role, active, status) VALUES (?,?,?,?,0,?)',
             [$name, $email, password_hash($pass, PASSWORD_DEFAULT), $role, 'pending']);
+        $newId = (int)db()->lastInsertId();
+        // Só o administrador precisa agir: é ele quem aprova
+        notify_admins('Nova solicitação de cadastro: ' . $name . ' (' . ROLES[$role] . ')', 'users.php', 'user:' . $newId);
+        audit('cadastro_solicitado', 'user', $newId, $name . ' <' . $email . '> — ' . ROLES[$role], null, $name);
         $_SESSION['reg_count']++;
         $done = true;
     }

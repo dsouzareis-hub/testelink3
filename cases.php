@@ -6,9 +6,8 @@ $isAdmin = $user['role'] === 'admin';
 if (is_post() && $isAdmin) {
     csrf_check();
     if (post('action') === 'delete' && ($id = post_int('id'))) {
-        purge_evidence_files([$id]);
-        q('DELETE FROM test_cases WHERE id = ?', [$id]);
-        flash('success', 'Caso de teste excluído.');
+        $ok = trash_delete_case($id, (int)$user['id']);
+        flash($ok ? 'success' : 'error', $ok ? 'Caso de teste enviado para a Lixeira, com o histórico de execuções. Dá para restaurar em Lixeira.' : 'Caso não encontrado.');
     }
     redirect('cases.php');
 }
@@ -74,7 +73,7 @@ include __DIR__ . '/includes/header.php';
                     <a class="btn btn-sm btn-ghost" href="case_view.php?id=<?= (int)$r['id'] ?>"><?= icon('eye', 14) ?></a>
                     <?php if ($isAdmin): ?>
                     <a class="btn btn-sm btn-ghost" href="case_form.php?id=<?= (int)$r['id'] ?>"><?= icon('edit', 14) ?></a>
-                    <form method="post" class="inline-form" data-confirm="O caso de teste e o histórico de execuções dele serão excluídos." data-confirm-title="Excluir caso de teste?" data-confirm-ok="Sim, excluir" data-confirm-type="danger">
+                    <form method="post" class="inline-form" data-confirm="O caso de teste e o histórico de execuções dele vão para a Lixeira. Você poderá restaurar depois." data-confirm-title="Enviar caso para a lixeira?" data-confirm-ok="Enviar para a lixeira" data-confirm-type="warning">
                         <?= csrf_field() ?><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
                         <button class="btn btn-sm btn-danger" type="submit"><?= icon('trash', 14) ?></button>
                     </form>

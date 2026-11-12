@@ -1,6 +1,6 @@
 <?php
 require __DIR__ . '/includes/bootstrap.php';
-require_role('admin');
+$me = require_role('admin');
 
 $projects = project_list();
 
@@ -21,17 +21,17 @@ if (is_post()) {
             // Mantém project_id dos casos coerente caso a suíte mude de projeto
             q('UPDATE suites SET project_id=?, name=?, description=? WHERE id=?', [$projectId, $name, $desc, $id]);
             q('UPDATE test_cases SET project_id=? WHERE suite_id=?', [$projectId, $id]);
+            audit('suite_editada', 'suite', $id, $name);
             flash('success', 'Suíte atualizada.');
         } else {
             q('INSERT INTO suites (project_id, name, description) VALUES (?,?,?)', [$projectId, $name, $desc]);
+            audit('suite_criada', 'suite', (int)db()->lastInsertId(), $name);
             flash('success', 'Suíte criada.');
         }
         redirect('suites.php?project=' . $projectId);
     } elseif ($action === 'delete' && $id) {
-        $caseIds = q('SELECT id FROM test_cases WHERE suite_id = ?', [$id])->fetchAll(PDO::FETCH_COLUMN);
-        purge_evidence_files($caseIds);
-        q('DELETE FROM suites WHERE id = ?', [$id]);
-        flash('success', 'Suíte excluída com seus casos de teste.');
+        $ok = trash_delete_suite($id, (int)$me['id']);
+        flash($ok ? 'success' : 'error', $ok ? 'Suíte enviada para a Lixeira, com seus casos. Dá para restaurar em Lixeira.' : 'Suíte não encontrada.');
     }
     redirect('suites.php');
 }
@@ -97,7 +97,7 @@ if ($showForm):
                 <td><a href="cases.php?suite=<?= (int)$s['id'] ?>"><?= (int)$s['cases'] ?></a></td>
                 <td class="actions">
                     <a class="btn btn-sm btn-ghost" href="suites.php?edit=<?= (int)$s['id'] ?>"><?= icon('edit', 14) ?> Editar</a>
-                    <form method="post" class="inline-form" data-confirm="A suíte e todos os seus casos de teste serão excluídos." data-confirm-title="Excluir suíte?" data-confirm-ok="Sim, excluir" data-confirm-type="danger">
+                    <form method="post" class="inline-form" data-confirm="A suíte e seus casos de teste vão para a Lixeira. Você poderá restaurar depois." data-confirm-title="Enviar suíte para a lixeira?" data-confirm-ok="Enviar para a lixeira" data-confirm-type="warning">
                         <?= csrf_field() ?><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= (int)$s['id'] ?>">
                         <button class="btn btn-sm btn-danger" type="submit"><?= icon('trash', 14) ?></button>
                     </form>

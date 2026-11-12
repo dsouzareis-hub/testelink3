@@ -103,26 +103,6 @@ function save_defect_images(int $defectId, ?int $commentId, int $userId, string 
     });
 }
 
-/** Remove do disco as imagens (evidências e fotos de defeitos) de uma lista de casos — usar ANTES de excluir os registros. */
-function purge_evidence_files(array $caseIds): void
-{
-    if (!$caseIds) {
-        return;
-    }
-    $in = implode(',', array_fill(0, count($caseIds), '?'));
-    $ids = array_values($caseIds);
-    $names = q("SELECT ev.stored_name FROM evidences ev JOIN executions ex ON ex.id = ev.execution_id
-                WHERE ex.case_id IN ($in)", $ids)->fetchAll(PDO::FETCH_COLUMN);
-    $names = array_merge($names, q("SELECT da.stored_name FROM defect_attachments da JOIN defects d ON d.id = da.defect_id
-                WHERE d.case_id IN ($in)", $ids)->fetchAll(PDO::FETCH_COLUMN));
-    foreach ($names as $name) {
-        $path = UPLOAD_DIR . basename($name);
-        if (is_file($path)) {
-            @unlink($path);
-        }
-    }
-}
-
 /** Evidências de uma execução. */
 function execution_evidences(int $executionId): array
 {

@@ -75,10 +75,17 @@ if ($role !== 'developer') {
 
 $pendingUsers = $role === 'admin' ? (int)q("SELECT COUNT(*) FROM users WHERE status = 'pending'")->fetchColumn() : 0;
 
+// Backup automático: no máximo 1 por dia, no primeiro acesso ao painel do dia (nunca derruba a página)
+backup_maybe_auto();
+$backupStale = $role === 'admin' && (!get_setting('last_backup_at') || strtotime(get_setting('last_backup_at')) < time() - 3 * 86400);
+
 $pageTitle = 'Dashboard';
 $active = 'dashboard.php';
 include __DIR__ . '/includes/header.php';
 ?>
+<?php if ($backupStale): ?>
+<div class="alert alert-error">O backup automático não está funcionando (nenhum backup nos últimos 3 dias). <a href="backups.php"><strong>Ver Backups</strong></a></div>
+<?php endif; ?>
 <?php if ($toDecide): ?>
 <div class="alert alert-warn"><?= $toDecide ?> chamado(s) aguardando a sua tomada de decisão (desenvolvedor ou reteste).
     <a href="defects.php?status=decision"><strong>Decidir agora</strong></a></div>

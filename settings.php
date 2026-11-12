@@ -36,6 +36,7 @@ if (is_post()) {
     foreach ($set as $k => $v) {
         q('INSERT INTO settings (k, v) VALUES (?, ?) ON DUPLICATE KEY UPDATE v = VALUES(v)', [$k, $v]);
     }
+    audit('configuracao', 'settings', null, 'Itens alterados: ' . implode(', ', array_keys($set)));
     flash('success', 'Configurações salvas.');
     redirect('settings.php');
 }

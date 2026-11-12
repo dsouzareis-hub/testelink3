@@ -108,7 +108,7 @@ A tela Meus Testes é um quadro Kanban escuro (preto/grafite com vermelho) com a
 - Quando um defeito do caso é marcado como **Corrigido**, o cartão volta para Em aberto (reteste) e começa um novo ciclo.
 - **Criticidade** (prioridade do caso) em etiquetas vermelhas de intensidade crescente: Baixo < Médio < Alto < Crítico (o mais vibrante, com brilho).
 
-> Já instalou antes? Execute uma vez, nesta ordem, `migration_registro.sql`, `migration_kanban.sql`, `migration_fluxo.sql`, `migration_decisao.sql`, `migration_comentarios.sql`, `migration_tipo_concluido.sql` e `migration_reteste_andamento.sql` no banco `testlink3` (nenhuma apaga dados).
+> Já instalou antes? Execute uma vez, nesta ordem, `migration_registro.sql`, `migration_kanban.sql`, `migration_fluxo.sql`, `migration_decisao.sql`, `migration_comentarios.sql`, `migration_tipo_concluido.sql`, `migration_reteste_andamento.sql` e `migration_protecao_notificacoes_passos.sql` no banco `testlink3` (nenhuma apaga dados).
 > Para rodar testes sem tocar no seu banco, aponte para outro com a variável de ambiente `TESTLINK_DB`.
 
 ## Relatórios
@@ -154,3 +154,38 @@ Ao registrar uma execução o tester informa o **Resultado** (Aprovado, Reprovad
 
 Não são usados `alert`/`confirm` nativos do navegador. As confirmações (excluir projeto/suíte/caso/usuário, recusar cadastro, fechar chamado) abrem um **diálogo estilizado** no padrão do site (fundo desfocado, ícone, título, texto e botões; em exclusão o foco começa em *Cancelar*; Esc ou clique fora cancelam).
 Para criar uma confirmação nova basta usar `data-confirm="mensagem"` em um `<form>` (opcionais: `data-confirm-title`, `data-confirm-ok`, `data-confirm-type="danger|warning|info"`). Em JavaScript: `TL.confirm({...})` e `TL.alert({...})` (ambos retornam Promise); `window.alert()` também usa o diálogo.
+
+## Notificações (sino na barra superior)
+
+Só é avisado **quem precisa realizar uma ação** — nunca quem acabou de fazê-la — e o aviso some sozinho quando a ação é feita:
+
+| Evento | Quem é avisado | O aviso some quando… |
+|---|---|---|
+| Tester reprova um teste | Administradores | o Admin toma a decisão |
+| Admin encaminha ao desenvolvedor | Desenvolvedor escolhido | ele conclui (ou o Admin redireciona) |
+| Dev conclui / reteste reprova | Administradores | o Admin decide de novo |
+| Admin envia ao tester (reteste) | Tester escolhido | ele executa o reteste |
+| Casos atribuídos a um tester | Tester | ele executa o caso |
+| Solicitação de cadastro | Administradores | o cadastro é aprovado ou recusado |
+
+Não há e-mail: os avisos são dentro do sistema (sino com contador; página *Notificações*).
+
+## Proteção contra perda de dados
+
+- **Lixeira**: excluir projeto, suíte ou caso **não apaga de vez**. O item vai para a *Lixeira* (menu do Admin) com tudo que dependia dele (versões, atribuições, execuções, passos, comentários, fotos, defeitos) e pode ser **restaurado com os mesmos números**. Se o pai (suíte/projeto) já não existir, a tela pede para restaurá-lo primeiro; se houver código duplicado, a restauração é recusada sem deixar nada pela metade. *Excluir definitivamente* e *Esvaziar lixeira* fazem um backup antes.
+- **Usuários com histórico não podem ser excluídos** (a exclusão apagaria execuções e chamados dele): use *Desativar*.
+- **Auditoria**: a tela *Auditoria* registra quem fez o quê e quando (acessos e falhas de login, usuários, projetos/suítes/casos, lixeira, atribuições, decisões em chamados, configurações, backups), com IP.
+- **Backups**: tela *Backups* (Admin). Backup **automático diário** (no primeiro acesso ao painel do dia; guarda os últimos 14), backup manual, download e exclusão. Gerados em PHP puro (`.sql.gz`) na pasta `backups/` (bloqueada para acesso direto e com nome aleatório). Para restaurar, importe o arquivo em um banco **vazio** (phpMyAdmin → Importar). As fotos ficam em `uploads/` (copie a pasta junto para um backup completo).
+
+## Passos em tópicos e resultado por passo
+
+- No cadastro do caso, os passos são **tópicos**: digite e aperte **Enter** para criar o próximo (Backspace em linha vazia remove; setas navegam; colar várias linhas cria vários passos).
+- Ao executar um teste e escolher **Reprovado**, aparece a lista de passos com caixas de seleção: marque **em qual passo falhou** (opcional). O sistema guarda uma cópia dos passos na execução e mostra *Passo(s) com falha* na execução, no chamado, no Ver Tudo e no PDF.
+
+## Colar print (Ctrl+V)
+
+Nas telas com anexo de imagem (executar, comentários da execução, retorno do chamado), **tire um print e cole direto com Ctrl+V**: ele vira anexo na hora (miniatura com botão para remover). Continua valendo só JPG/PNG/WEBP, até 10 por envio.
+
+## Kanban em tablet/celular
+
+O arrastar funciona também **com o dedo**: segure o cartão por ~0,3 s e arraste até a coluna (rolar a página continua normal).

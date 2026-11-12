@@ -46,6 +46,11 @@ $sys = get_setting('system_name', APP_NAME);
             <button class="btn-icon menu-toggle" type="button" data-menu-toggle aria-label="Menu"><?= icon('menu', 22) ?></button>
             <?php if (!empty($backUrl)): ?><?= back_button($backUrl, 'btn-sm') ?><?php endif; ?>
             <h1><?= e($pageTitle) ?></h1>
+            <?php $unreadN = unread_notifications((int)$user['id']); ?>
+            <a href="notifications.php" class="bell <?= $unreadN ? 'has' : '' ?>" title="<?= $unreadN ? $unreadN . ' aviso(s) que precisam da sua ação' : 'Nenhum aviso pendente' ?>"
+               aria-label="Notificações: <?= $unreadN ?> pendente(s)">
+                <?= icon('bell', 20) ?><?php if ($unreadN): ?><span class="bell-count"><?= $unreadN > 99 ? '99+' : $unreadN ?></span><?php endif; ?>
+            </a>
         </header>
         <main class="content">
             <?php foreach (flashes() as [$type, $msg]): ?>

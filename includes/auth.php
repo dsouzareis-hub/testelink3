@@ -100,11 +100,13 @@ function attempt_login(string $email, string $password): ?string
             $_SESSION['login_block_until'] = $now + 60;
             $_SESSION['login_fails'] = 0;
         }
+        audit('login_falhou', 'user', $user ? (int)$user['id'] : null, 'E-mail informado: ' . mb_substr($email, 0, 120), $user ? (int)$user['id'] : null, $email);
         return 'E-mail ou senha inválidos, ou usuário inativo.';
     }
 
     session_regenerate_id(true);
     $_SESSION['uid'] = (int)$user['id'];
+    audit('login', 'user', (int)$user['id'], '', (int)$user['id'], $email);
     unset($_SESSION['login_fails'], $_SESSION['login_block_until']);
     if (password_needs_rehash($hash, PASSWORD_DEFAULT)) {
         q('UPDATE users SET password_hash = ? WHERE id = ?', [password_hash($password, PASSWORD_DEFAULT), $user['id']]);

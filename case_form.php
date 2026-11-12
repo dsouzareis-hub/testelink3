@@ -17,7 +17,7 @@ if (is_post()) {
         'code'            => post('code'),
         'title'           => post('title'),
         'preconditions'   => post('preconditions'),
-        'steps'           => post('steps'),
+        'steps'           => steps_from_post(),          // passos em tópicos (steps[]), um por linha no banco
         'expected_result' => post('expected_result'),
         'priority'        => post('priority'),
         'status'          => post('status') === 'inactive' ? 'inactive' : 'active',
@@ -76,6 +76,7 @@ if (is_post()) {
                 ]);
             }
             $pdo->commit();
+            audit($id ? 'caso_editado' : 'caso_criado', 'case', $caseId, $data['code'] . ' — ' . $data['title'] . ' (v' . $version . ')');
             flash('success', $id ? 'Caso de teste atualizado.' : 'Caso de teste criado.');
             redirect('case_view.php?id=' . $caseId);
         } catch (Throwable $ex) {
@@ -124,9 +125,19 @@ include __DIR__ . '/includes/header.php';
             <label class="field">Prioridade <select name="priority"><?= options(LEVELS, $case['priority']) ?></select></label>
             <label class="field span-2">Pré-condições <textarea name="preconditions" rows="3"><?= e($case['preconditions']) ?></textarea></label>
             <label class="field">Status <select name="status"><?= options(['active' => 'Ativo', 'inactive' => 'Inativo'], $case['status']) ?></select></label>
-            <label class="field span-2">Passos de execução <small>(um passo por linha)</small>
-                <textarea name="steps" rows="7" required><?= e($case['steps']) ?></textarea>
-            </label>
+            <div class="field span-2">
+                <span>Passos de execução <small>— digite o passo e aperte <strong>Enter</strong> para criar o próximo; cada passo vira um tópico</small></span>
+                <ul class="steps-editor" data-steps-editor>
+                    <?php foreach (steps_list((string)$case['steps']) ?: [''] as $i => $s): ?>
+                        <li class="step-row">
+                            <span class="step-box" aria-hidden="true"></span><span class="step-no"><?= $i + 1 ?>.</span>
+                            <input type="text" name="steps[]" value="<?= e($s) ?>" maxlength="500" autocomplete="off" placeholder="Descreva o passo e aperte Enter">
+                            <button type="button" class="step-del" aria-label="Remover passo" title="Remover passo">×</button>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+                <button type="button" class="btn btn-ghost btn-sm" data-step-add style="align-self:flex-start">+ Adicionar passo</button>
+            </div>
             <label class="field">Resultado esperado <textarea name="expected_result" rows="7" required><?= e($case['expected_result']) ?></textarea></label>
             <label class="field span-2">Motivo da alteração <small>(registrado no histórico de versões)</small>
                 <input type="text" name="change_note" maxlength="255" value="<?= e($_POST['change_note'] ?? '') ?>">

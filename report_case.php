@@ -43,6 +43,7 @@ include __DIR__ . '/includes/header.php';
         <?= result_badge($x['result']) ?>
     </div>
     <p class="pre"><strong>Assentamento:</strong> <?= e($x['notes'] ?: '—') ?></p>
+    <?php if ($failedSteps = execution_failed_steps((int)$x['id'])): ?><p><strong>Passo(s) com falha:</strong></p><?= failed_steps_html($failedSteps) ?><?php endif; ?>
     <?= evidence_gallery(execution_evidences((int)$x['id'])) ?>
 </div>
 <?php endforeach; ?>

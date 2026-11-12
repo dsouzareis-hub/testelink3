@@ -145,6 +145,76 @@
         });
     });
 
+    // ----- Toque (tablet/celular): o arrastar nativo do navegador não funciona com o dedo -----
+    // Segure o cartão por ~0,3 s (ele "levanta") e arraste até a coluna; rolar a página normalmente continua funcionando.
+    var tch = { timer: null, active: false, card: null, ghost: null, sx: 0, sy: 0, col: null };
+
+    function tchColumnAt(x, y) {
+        if (tch.ghost) { tch.ghost.style.display = 'none'; }
+        var el = document.elementFromPoint(x, y);
+        if (tch.ghost) { tch.ghost.style.display = ''; }
+        return el && el.closest ? el.closest('.kb-col') : null;
+    }
+    function tchPlaceGhost(x, y) {
+        if (!tch.ghost) { return; }
+        tch.ghost.style.left = (x - tch.ghost.offsetWidth / 2) + 'px';
+        tch.ghost.style.top = (y - 24) + 'px';
+    }
+    function tchReset() {
+        clearTimeout(tch.timer);
+        if (tch.ghost) { tch.ghost.remove(); }
+        if (tch.card) { tch.card.classList.remove('dragging'); }
+        board.querySelectorAll('.kb-col').forEach(function (c) { c.classList.remove('over'); });
+        tch.timer = null; tch.active = false; tch.card = null; tch.ghost = null; tch.col = null;
+    }
+
+    board.addEventListener('touchstart', function (ev) {
+        if (ev.touches.length !== 1) { tchReset(); return; }
+        var card = ev.target.closest && ev.target.closest('.kb-card');
+        if (!card || card.classList.contains('locked') || ev.target.closest('a, button, select, input, textarea')) { return; }
+        var t = ev.touches[0];
+        tch.card = card; tch.sx = t.clientX; tch.sy = t.clientY;
+        tch.timer = setTimeout(function () {
+            tch.active = true;
+            card.classList.add('dragging');
+            tch.ghost = card.cloneNode(true);
+            tch.ghost.classList.add('kb-ghost');
+            tch.ghost.classList.remove('dragging');
+            tch.ghost.style.width = card.offsetWidth + 'px';
+            document.body.appendChild(tch.ghost);
+            tchPlaceGhost(tch.sx, tch.sy);
+            if (navigator.vibrate) { navigator.vibrate(15); }
+        }, 300);
+    }, { passive: true });
+
+    board.addEventListener('touchmove', function (ev) {
+        if (!tch.card) { return; }
+        var t = ev.touches[0];
+        if (!tch.active) {
+            // Moveu antes de "levantar": é rolagem, não arraste
+            if (Math.hypot(t.clientX - tch.sx, t.clientY - tch.sy) > 10) { tchReset(); }
+            return;
+        }
+        ev.preventDefault();                                   // arrastando: a página não rola
+        tchPlaceGhost(t.clientX, t.clientY);
+        var col = tchColumnAt(t.clientX, t.clientY);
+        board.querySelectorAll('.kb-col').forEach(function (c) { c.classList.toggle('over', c === col); });
+        tch.col = col;
+    }, { passive: false });
+
+    function tchEnd(ev) {
+        if (!tch.card) { return; }
+        var card = tch.card, col = tch.col, was = tch.active;
+        var t = ev.changedTouches && ev.changedTouches[0];
+        if (was && t) { col = tchColumnAt(t.clientX, t.clientY) || col; }
+        tchReset();
+        if (was && col && ev.type === 'touchend' && col.dataset.status !== card.dataset.status) { move(card, col.dataset.status); }
+    }
+    board.addEventListener('touchend', tchEnd);
+    board.addEventListener('touchcancel', tchEnd);
+    // Evita o menu "segurar para copiar" do navegador em cima do cartão
+    board.addEventListener('contextmenu', function (ev) { if (ev.target.closest && ev.target.closest('.kb-card')) { ev.preventDefault(); } });
+
     // ----- Seletor "Mover para" (teclado, toque e quem não arrasta) -----
     board.addEventListener('submit', function (ev) {
         var form = ev.target.closest('.move-form');

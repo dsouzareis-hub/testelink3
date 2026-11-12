@@ -15,6 +15,25 @@
 /** Status em que o chamado está nas mãos do desenvolvedor (visível e editável por ele). */
 const DEV_ACTIVE_STATUS = ['open', 'fixing'];
 
+/** Passos marcados como falhos numa execução (Reprovado): lista de [step_no, step_text]. */
+function execution_failed_steps(int $executionId): array
+{
+    return q('SELECT step_no, step_text FROM execution_steps WHERE execution_id = ? AND failed = 1 ORDER BY step_no', [$executionId])->fetchAll();
+}
+
+/** HTML da lista de passos com falha (vazio se não houver). */
+function failed_steps_html(array $steps): string
+{
+    if (!$steps) {
+        return '';
+    }
+    $html = '<ul class="step-failed-list">';
+    foreach ($steps as $s) {
+        $html .= '<li>Passo ' . (int)$s['step_no'] . ' — ' . e($s['step_text']) . '</li>';
+    }
+    return $html . '</ul>';
+}
+
 /** Chamado ainda não resolvido para este caso (evita duplicar chamados). */
 function unresolved_defect_for_case(int $caseId): ?array
 {
@@ -48,6 +67,9 @@ function create_triage_defect(int $executionId, int $testerId): int
     ]);
     $id = (int)db()->lastInsertId();
     add_defect_comment($id, $testerId, 'Execução reprovada. Aguardando o Administrador encaminhar ao desenvolvedor.', null, 'triage');
+    // Quem precisa agir: o administrador (tomada de decisão)
+    notify_admins('Chamado #' . $id . ' (' . $ex['code'] . ') aguardando a sua decisão — reprovado no teste.',
+        'defect_view.php?id=' . $id, 'decide:' . $id, $testerId);
     return $id;
 }
 
@@ -74,6 +96,7 @@ function decide_defect(int $defectId, string $target, int $targetUserId, string 
     if (!isset(LEVELS[$urgency])) {
         throw new InvalidArgumentException('Selecione a urgência.');
     }
+    $code = (string)q('SELECT code FROM test_cases WHERE id = ?', [$d['case_id']])->fetchColumn();
 
     if ($target === 'developer') {
         $dev = q("SELECT name FROM users WHERE id = ? AND role = 'developer' AND active = 1 AND status = 'approved'", [$targetUserId])->fetchColumn();
@@ -83,6 +106,12 @@ function decide_defect(int $defectId, string $target, int $targetUserId, string 
         q("UPDATE defects SET assigned_to = ?, retest_tester_id = NULL, priority = ?, status = 'open' WHERE id = ?", [$targetUserId, $urgency, $defectId]);
         add_defect_comment($defectId, $adminId, 'Decisão do Administrador: encaminhado ao desenvolvedor ' . $dev . ' — urgência ' . LEVELS[$urgency] . '.',
             $d['status'], 'open');
+        // A decisão foi tomada (baixa o aviso dos admins) e agora quem precisa agir é o desenvolvedor
+        notify_resolve('decide:' . $defectId);
+        notify_resolve('retest:' . $defectId);
+        notify($targetUserId, 'Chamado #' . $defectId . ' (' . $code . ') encaminhado a você — urgência ' . LEVELS[$urgency] . '.',
+            'defect_view.php?id=' . $defectId, 'dev:' . $defectId);
+        audit('chamado_decisao', 'defect', $defectId, 'Desenvolvedor: ' . $dev . ' — urgência ' . LEVELS[$urgency]);
         return;
     }
 
@@ -96,6 +125,11 @@ function decide_defect(int $defectId, string $target, int $targetUserId, string 
         q("UPDATE assignments SET kanban_status = 'doing', cycle_start = NOW(), done_at = NULL WHERE case_id = ? AND tester_id = ?", [$d['case_id'], $targetUserId]);
         add_defect_comment($defectId, $adminId, 'Decisão do Administrador: enviado ao tester ' . $testers[$targetUserId] . ' para reteste — urgência ' . LEVELS[$urgency] . '.',
             $d['status'], 'retest');
+        notify_resolve('decide:' . $defectId);
+        notify_resolve('dev:' . $defectId);
+        notify($targetUserId, 'Reteste solicitado: caso ' . $code . ' (chamado #' . $defectId . ') — urgência ' . LEVELS[$urgency] . '.',
+            'case_view.php?id=' . (int)$d['case_id'], 'retest:' . $defectId);
+        audit('chamado_decisao', 'defect', $defectId, 'Reteste com ' . $testers[$targetUserId] . ' — urgência ' . LEVELS[$urgency]);
         return;
     }
 
@@ -119,8 +153,33 @@ function set_defect_status(int $defectId, string $new, int $userId, ?string $com
     }
     if ($old !== $new) {
         q('UPDATE defects SET status = ? WHERE id = ?', [$new, $defectId]);
+        defect_status_notifications($defectId, $new, $userId);
     }
     return add_defect_comment($defectId, $userId, $comment, $old !== $new ? $old : null, $old !== $new ? $new : null);
+}
+
+/**
+ * Avisos gerados por uma mudança de status. Só avisa quem precisa agir (nunca quem acabou de agir):
+ *  - concluído pelo dev / reaberto no reteste → o ADMIN precisa decidir;
+ *  - fechado → ninguém mais precisa agir: dá baixa em todos os avisos do chamado.
+ */
+function defect_status_notifications(int $defectId, string $new, int $actorId): void
+{
+    $code = (string)q('SELECT tc.code FROM defects d JOIN test_cases tc ON tc.id = d.case_id WHERE d.id = ?', [$defectId])->fetchColumn();
+    $link = 'defect_view.php?id=' . $defectId;
+    switch ($new) {
+        case 'fixed':
+            notify_resolve('dev:' . $defectId);
+            notify_admins('Chamado #' . $defectId . ' (' . $code . ') concluído pelo desenvolvedor — aguardando a sua decisão.', $link, 'decide:' . $defectId, $actorId);
+            break;
+        case 'reopened':
+            notify_resolve('retest:' . $defectId);
+            notify_admins('Chamado #' . $defectId . ' (' . $code . ') reaberto no reteste — aguardando a sua decisão.', $link, 'decide:' . $defectId, $actorId);
+            break;
+        case 'closed':
+            foreach (['decide:', 'dev:', 'retest:'] as $p) { notify_resolve($p . $defectId); }
+            break;
+    }
 }
 
 /** Este desenvolvedor já concluiu este chamado em algum momento? (o chamado fica na coluna Concluído dele, só leitura) */

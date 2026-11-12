@@ -44,6 +44,13 @@ if (is_post()) {
                 [$caseId, $uid, $result, $execType, $notes ?: null, $case['version']]);
             $execId = (int)$pdo->lastInsertId();
 
+            // Resultado por passo: guarda os passos do caso nesta execução e quais falharam (só vale se Reprovado)
+            $failedNos = $result === 'failed' ? array_map('intval', (array)($_POST['failed_steps'] ?? [])) : [];
+            foreach (steps_list((string)$case['steps']) as $i => $stepText) {
+                q('INSERT INTO execution_steps (execution_id, step_no, step_text, failed) VALUES (?,?,?,?)',
+                    [$execId, $i + 1, $stepText, in_array($i + 1, $failedNos, true) ? 1 : 0]);
+            }
+
             // Reprovado: abre o chamado "Aguardando triagem". O tester NÃO escolhe o desenvolvedor — o Admin encaminha.
             $defectNew = null;
             if (!$retest && $result === 'failed') {
@@ -68,6 +75,7 @@ if (is_post()) {
     if (!$error) {
         [$saved, $uploadErrors] = save_evidences($execId);
         foreach ($uploadErrors as $m) { flash('warn', $m); }
+        notify_resolve('assign:' . $caseId, $uid);        // o tester já agiu neste caso: baixa o aviso de atribuição
         // Ajusta o Kanban já com as fotos salvas: Aprovado + comentário vai direto para Concluído
         $kanbanMsg = kanban_after_execution($caseId, $uid, $result);
         flash('success', 'Execução registrada' . ($saved ? " com $saved evidência(s)" : '') . '.'
@@ -122,6 +130,18 @@ include __DIR__ . '/includes/header.php';
             <select name="exec_type" required><?= options(EXEC_TYPES, $_POST['exec_type'] ?? 'manual') ?></select>
         </label>
     </div>
+    <?php $stepList = steps_list((string)$case['steps']); $postedFailed = array_map('strval', (array)($_POST['failed_steps'] ?? [])); ?>
+    <?php if ($stepList): ?>
+    <div class="failed-steps" data-failed-steps hidden style="margin:14px 0">
+        <strong>Em qual passo falhou?</strong> <span class="muted">(opcional — marque o(s) passo(s) com problema; o desenvolvedor verá isso no chamado)</span>
+        <div class="step-checks">
+            <?php foreach ($stepList as $i => $s): $n = $i + 1; ?>
+                <label class="step-check"><input type="checkbox" name="failed_steps[]" value="<?= $n ?>" <?= in_array((string)$n, $postedFailed, true) ? 'checked' : '' ?>>
+                    <span><?= $n ?>. <?= e($s) ?></span></label>
+            <?php endforeach; ?>
+        </div>
+    </div>
+    <?php endif; ?>
     <div class="grid">
 
         <label class="field">Assentamento (observações do tester)
@@ -129,6 +149,7 @@ include __DIR__ . '/includes/header.php';
         </label>
         <label class="field">Evidências (JPG, PNG ou WEBP — até <?= (int)(max_upload_bytes() / 1048576) ?> MB cada)
             <input type="file" name="evidences[]" accept="image/jpeg,image/png,image/webp" multiple data-preview-input>
+            <span class="paste-hint"><?= icon('upload', 16) ?> Dica: tire um print e cole aqui direto com <kbd>Ctrl</kbd>+<kbd>V</kbd> — sem precisar salvar o arquivo.</span>
         </label>
         <div class="gallery preview-list" data-preview-box></div>
     </div>
