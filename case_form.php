@@ -78,6 +78,11 @@ if (is_post()) {
             $pdo->commit();
             audit($id ? 'caso_editado' : 'caso_criado', 'case', $caseId, $data['code'] . ' — ' . $data['title'] . ' (v' . $version . ')');
             flash('success', $id ? 'Caso de teste atualizado.' : 'Caso de teste criado.');
+            // Atribuição aos testers marcados (avisa quem recebeu; não remove quem já executou)
+            $as = sync_case_testers($caseId, (array)($_POST['testers'] ?? []), (int)$me['id']);
+            if ($as['added']) { flash('success', 'Atribuído a: ' . implode(', ', $as['added']) . '.'); }
+            if ($as['removed']) { flash('success', 'Atribuição removida de: ' . implode(', ', $as['removed']) . '.'); }
+            if ($as['kept']) { flash('warn', implode(', ', $as['kept']) . ' já executou este caso e continua atribuído (para não esconder o histórico).'); }
             redirect('case_view.php?id=' . $caseId);
         } catch (Throwable $ex) {
             $pdo->rollBack();
@@ -96,6 +101,12 @@ if (!$case) {
         'steps' => '', 'expected_result' => '', 'priority' => 'medium', 'status' => 'active',
     ];
 }
+
+// Testers ativos e quais estão marcados (após erro de validação mantém a marcação enviada)
+$allTesters = users_by_role('tester');
+$selTesters = is_post()
+    ? array_map('intval', (array)($_POST['testers'] ?? []))
+    : ($case['id'] ? array_map('intval', q('SELECT tester_id FROM assignments WHERE case_id = ?', [$case['id']])->fetchAll(PDO::FETCH_COLUMN)) : []);
 
 $pageTitle = $case['id'] ? 'Editar caso de teste' : 'Novo caso de teste';
 $active = 'cases.php';
@@ -125,6 +136,19 @@ include __DIR__ . '/includes/header.php';
             <label class="field">Prioridade <select name="priority"><?= options(LEVELS, $case['priority']) ?></select></label>
             <label class="field span-2">Pré-condições <textarea name="preconditions" rows="3"><?= e($case['preconditions']) ?></textarea></label>
             <label class="field">Status <select name="status"><?= options(['active' => 'Ativo', 'inactive' => 'Inativo'], $case['status']) ?></select></label>
+            <div class="field" style="grid-column:1/-1">
+                <span>Atribuir a testers <small>— quem for marcado recebe o caso em “Em aberto” no Kanban e um aviso</small></span>
+                <?php if (!$allTesters): ?>
+                    <p class="alert alert-warn" style="margin:4px 0 0">Não há testers ativos. <a href="users.php?new=1">Cadastre um usuário</a> com perfil Tester.</p>
+                <?php else: ?>
+                <div class="tester-pick">
+                    <?php foreach ($allTesters as $tid => $tname): ?>
+                        <label class="check pick"><input type="checkbox" name="testers[]" value="<?= (int)$tid ?>" <?= in_array((int)$tid, $selTesters, true) ? 'checked' : '' ?>> <?= e($tname) ?></label>
+                    <?php endforeach; ?>
+                </div>
+                <?php if ($case['id']): ?><small>Desmarcar remove o tester do caso, exceto se ele já executou (aí continua atribuído, para não esconder o histórico).</small><?php endif; ?>
+                <?php endif; ?>
+            </div>
             <div class="field span-2">
                 <span>Passos de execução <small>— digite o passo e aperte <strong>Enter</strong> para criar o próximo; cada passo vira um tópico</small></span>
                 <ul class="steps-editor" data-steps-editor>

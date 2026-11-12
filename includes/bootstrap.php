@@ -28,3 +28,4 @@ require __DIR__ . '/audit.php';
 require __DIR__ . '/trash.php';
 require __DIR__ . '/backup.php';
 require __DIR__ . '/defects_lib.php';
+require __DIR__ . '/assign.php';
