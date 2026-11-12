@@ -57,7 +57,7 @@ include __DIR__ . '/includes/header.php';
             <a class="btn btn-ghost" href="report_case.php?id=<?= $id ?>" title="Todas as execuções, evidências e defeitos deste caso — com Imprimir e Baixar PDF"><?= icon('eye', 16) ?> Ver Tudo</a>
         </div>
     </div>
-    <dl class="detail-grid">
+    <dl class="detail-grid rows">
         <dt>Projeto / Suíte</dt><dd><?= e($case['project']) ?> / <?= e($case['suite']) ?></dd>
         <dt>Prioridade</dt><dd><?= level_badge($case['priority']) ?></dd>
         <dt>Status</dt><dd><?= $case['status'] === 'active' ? badge('Ativo', 'green') : badge('Inativo', 'gray') ?></dd>

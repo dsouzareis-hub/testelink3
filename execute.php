@@ -96,7 +96,7 @@ include __DIR__ . '/includes/header.php';
             Aprovado fecha o defeito; reprovado o reabre automaticamente.</div>
     <?php endif; ?>
     <p class="muted"><?= e($case['project']) ?> / <?= e($case['suite']) ?></p>
-    <dl class="detail-grid">
+    <dl class="detail-grid rows">
         <dt>Pré-condições</dt><dd class="pre"><?= e($case['preconditions'] ?: '—') ?></dd>
         <dt>Passos</dt>
         <dd><ol class="steps">

@@ -175,6 +175,27 @@ legend { font-weight: 700; padding: 0 6px; }
 .detail-grid { display: grid; grid-template-columns: 180px 1fr; gap: 8px 16px; }
 .detail-grid dt { color: var(--muted); font-weight: 600; font-size: .88rem; }
 .detail-grid dd { margin: 0; }
+
+/* Variante "tabela": cada par rótulo/valor vira uma linha separada (cinza claro + sombra suave) */
+.detail-grid.rows { gap: 0; grid-template-columns: 200px 1fr; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; box-shadow: var(--shadow); }
+.detail-grid.rows dt, .detail-grid.rows dd {
+    padding: 12px 16px; margin: 0; position: relative;
+    border-bottom: 1px solid #e5e7eb; box-shadow: 0 3px 4px -3px rgba(16, 24, 40, .22);   /* sombra só embaixo: mostra a separação */
+}
+.detail-grid.rows dt { background: #f1f3f5; color: #374151; border-right: 1px solid #e5e7eb; display: flex; align-items: flex-start; }
+.detail-grid.rows dd { background: #fff; }
+.detail-grid.rows dd:nth-of-type(even) { background: #fafbfc; }            /* zebra leve nos valores */
+.detail-grid.rows dt:last-of-type, .detail-grid.rows dd:last-of-type { border-bottom: 0; box-shadow: none; }
+@media (max-width: 640px) {
+    .detail-grid.rows { grid-template-columns: 1fr; }
+    .detail-grid.rows dt { border-right: 0; padding-bottom: 6px; border-bottom: 0; box-shadow: none; }
+    .detail-grid.rows dd { padding-top: 6px; }
+}
+@media print {
+    .detail-grid.rows { box-shadow: none; }
+    .detail-grid.rows dt, .detail-grid.rows dd { box-shadow: none; background: #fff !important; }
+    .detail-grid.rows dt { background: #eee !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
 .pre { white-space: pre-wrap; word-wrap: break-word; }
 ol.steps { margin: 0; padding-left: 22px; }
 ol.steps li { margin-bottom: 6px; }

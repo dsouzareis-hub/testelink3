@@ -21,7 +21,7 @@ include __DIR__ . '/includes/header.php';
 
 <div class="card">
     <h2><?= e($case['code']) ?> · <?= e($case['title']) ?> <small class="muted">v<?= (int)$case['version'] ?></small></h2>
-    <dl class="detail-grid">
+    <dl class="detail-grid rows">
         <dt>Projeto / Suíte</dt><dd><?= e($case['project']) ?> / <?= e($case['suite']) ?></dd>
         <dt>Prioridade</dt><dd><?= e(LEVELS[$case['priority']]) ?></dd>
         <dt>Pré-condições</dt><dd class="pre"><?= e($case['preconditions'] ?: '—') ?></dd>
