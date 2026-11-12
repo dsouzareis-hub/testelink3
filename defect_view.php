@@ -186,7 +186,7 @@ include __DIR__ . '/includes/header.php';
         <div class="form-actions"><button class="btn" type="submit"><?= icon('check', 16) ?> Confirmar decisão</button></div>
     </form>
     <?php endif; ?>
-    <form method="post" data-confirm="Fechar este chamado sem encaminhar?" style="margin-top:14px">
+    <form method="post" data-confirm="O chamado será encerrado sem ser encaminhado ao desenvolvedor nem ao tester." data-confirm-title="Fechar chamado?" data-confirm-ok="Fechar chamado" data-confirm-type="warning" style="margin-top:14px">
         <?= csrf_field() ?><input type="hidden" name="action" value="close">
         <button class="btn btn-ghost btn-sm" type="submit">Fechar chamado sem encaminhar</button>
     </form>

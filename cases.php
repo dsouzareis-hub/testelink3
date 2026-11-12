@@ -74,7 +74,7 @@ include __DIR__ . '/includes/header.php';
                     <a class="btn btn-sm btn-ghost" href="case_view.php?id=<?= (int)$r['id'] ?>"><?= icon('eye', 14) ?></a>
                     <?php if ($isAdmin): ?>
                     <a class="btn btn-sm btn-ghost" href="case_form.php?id=<?= (int)$r['id'] ?>"><?= icon('edit', 14) ?></a>
-                    <form method="post" class="inline-form" data-confirm="Excluir este caso de teste e seu histórico de execuções?">
+                    <form method="post" class="inline-form" data-confirm="O caso de teste e o histórico de execuções dele serão excluídos." data-confirm-title="Excluir caso de teste?" data-confirm-ok="Sim, excluir" data-confirm-type="danger">
                         <?= csrf_field() ?><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
                         <button class="btn btn-sm btn-danger" type="submit"><?= icon('trash', 14) ?></button>
                     </form>

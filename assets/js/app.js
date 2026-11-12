@@ -14,10 +14,108 @@
         });
     }
 
-    // Confirmação em ações destrutivas: <form data-confirm="mensagem">
+    /* ------------------------------------------------------------------
+     * Diálogos estilizados (no lugar de alert/confirm nativos do navegador)
+     *   TL.confirm({title, message, ok, cancel, type}) -> Promise<boolean>
+     *   TL.alert({title, message, ok, type})            -> Promise<void>
+     *   type: 'danger' | 'warning' | 'info' | 'success'
+     * window.alert também passa a usar este diálogo.
+     * ------------------------------------------------------------------ */
+    var ICONS = {
+        danger: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+        warning: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+        info: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>',
+        success: '<polyline points="20 6 9 17 4 12"/>'
+    };
+    var dlg = null;
+
+    function buildDialog() {
+        dlg = document.createElement('div');
+        dlg.className = 'dialog-overlay';
+        dlg.hidden = true;
+        dlg.innerHTML =
+            '<div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="dlg-title" aria-describedby="dlg-msg">' +
+            '<div class="dialog-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg></div>' +
+            '<h3 class="dialog-title" id="dlg-title"></h3>' +
+            '<p class="dialog-msg" id="dlg-msg"></p>' +
+            '<div class="dialog-actions"><button type="button" class="btn btn-ghost" data-dlg-cancel></button>' +
+            '<button type="button" class="btn" data-dlg-ok></button></div></div>';
+        document.body.appendChild(dlg);
+    }
+
+    function openDialog(opts, withCancel) {
+        return new Promise(function (resolve) {
+            if (!dlg) { buildDialog(); }
+            var type = ICONS[opts.type] ? opts.type : (withCancel ? 'warning' : 'info');
+            var box = dlg.querySelector('.dialog');
+            var okBtn = dlg.querySelector('[data-dlg-ok]');
+            var cancelBtn = dlg.querySelector('[data-dlg-cancel]');
+            var previous = document.activeElement;
+
+            box.className = 'dialog dialog-' + type;
+            dlg.querySelector('svg').innerHTML = ICONS[type];
+            dlg.querySelector('.dialog-title').textContent = opts.title || (withCancel ? 'Confirmar ação' : 'Aviso');
+            dlg.querySelector('.dialog-msg').textContent = opts.message || '';
+            okBtn.textContent = opts.ok || (withCancel ? 'Confirmar' : 'OK');
+            okBtn.className = 'btn ' + (type === 'danger' ? 'btn-danger' : (type === 'success' ? 'btn-success' : ''));
+            cancelBtn.textContent = opts.cancel || 'Cancelar';
+            cancelBtn.hidden = !withCancel;
+            dlg.hidden = false;
+            document.body.classList.add('lb-open');
+            // Em ação destrutiva o foco começa em "Cancelar" (mais seguro)
+            (withCancel && type === 'danger' ? cancelBtn : okBtn).focus();
+
+            function done(result) {
+                dlg.hidden = true;
+                document.body.classList.remove('lb-open');
+                dlg.removeEventListener('click', onClick);
+                document.removeEventListener('keydown', onKey, true);
+                if (previous && previous.focus) { previous.focus(); }
+                resolve(result);
+            }
+            function onClick(ev) {
+                if (ev.target === dlg) { done(false); }                       // clique fora
+                else if (ev.target.closest('[data-dlg-ok]')) { done(true); }
+                else if (ev.target.closest('[data-dlg-cancel]')) { done(false); }
+            }
+            function onKey(ev) {
+                if (ev.key === 'Escape') { ev.preventDefault(); done(false); }
+                else if (ev.key === 'Tab') {                                  // mantém o foco dentro do diálogo
+                    ev.preventDefault();
+                    var btns = [cancelBtn, okBtn].filter(function (b) { return !b.hidden; });
+                    var i = btns.indexOf(document.activeElement);
+                    btns[(i + (ev.shiftKey ? btns.length - 1 : 1)) % btns.length].focus();
+                }
+            }
+            dlg.addEventListener('click', onClick);
+            document.addEventListener('keydown', onKey, true);
+        });
+    }
+
+    window.TL = {
+        confirm: function (opts) { return openDialog(typeof opts === 'string' ? { message: opts } : (opts || {}), true); },
+        alert: function (opts) { return openDialog(typeof opts === 'string' ? { message: opts } : (opts || {}), false); }
+    };
+    window.alert = function (msg) { window.TL.alert({ message: String(msg) }); };   // alert() nativo passa a ser estilizado
+
+    // Confirmação em ações destrutivas: <form data-confirm="mensagem"
+    //   data-confirm-title="Título" data-confirm-ok="Texto do botão" data-confirm-type="danger|warning|info">
     document.addEventListener('submit', function (ev) {
-        var msg = ev.target.getAttribute && ev.target.getAttribute('data-confirm');
-        if (msg && !window.confirm(msg)) { ev.preventDefault(); }
+        var form = ev.target;
+        var msg = form.getAttribute && form.getAttribute('data-confirm');
+        if (!msg || form.dataset.confirmed === '1') { return; }
+        ev.preventDefault();
+        var submitter = ev.submitter || null;
+        window.TL.confirm({
+            title: form.getAttribute('data-confirm-title') || 'Confirmar ação',
+            message: msg,
+            ok: form.getAttribute('data-confirm-ok') || 'Confirmar',
+            type: form.getAttribute('data-confirm-type') || 'danger'
+        }).then(function (yes) {
+            if (!yes) { return; }
+            form.dataset.confirmed = '1';
+            if (form.requestSubmit) { form.requestSubmit(submitter); } else { form.submit(); }
+        });
     });
 
     // Botão Voltar: usa a página anterior do histórico; se ela não serve, segue o link de reserva (href)

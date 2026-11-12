@@ -97,7 +97,7 @@ if ($showForm):
                 <td><a href="cases.php?suite=<?= (int)$s['id'] ?>"><?= (int)$s['cases'] ?></a></td>
                 <td class="actions">
                     <a class="btn btn-sm btn-ghost" href="suites.php?edit=<?= (int)$s['id'] ?>"><?= icon('edit', 14) ?> Editar</a>
-                    <form method="post" class="inline-form" data-confirm="Excluir a suíte e todos os seus casos de teste?">
+                    <form method="post" class="inline-form" data-confirm="A suíte e todos os seus casos de teste serão excluídos." data-confirm-title="Excluir suíte?" data-confirm-ok="Sim, excluir" data-confirm-type="danger">
                         <?= csrf_field() ?><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= (int)$s['id'] ?>">
                         <button class="btn btn-sm btn-danger" type="submit"><?= icon('trash', 14) ?></button>
                     </form>

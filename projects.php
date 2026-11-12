@@ -83,7 +83,7 @@ if ($showForm):
                 <td><?= $p['status'] === 'active' ? badge('Ativo', 'green') : badge('Arquivado', 'gray') ?></td>
                 <td class="actions">
                     <a class="btn btn-sm btn-ghost" href="projects.php?edit=<?= (int)$p['id'] ?>"><?= icon('edit', 14) ?> Editar</a>
-                    <form method="post" class="inline-form" data-confirm="Excluir o projeto e TODOS os seus casos, execuções e defeitos? Esta ação não pode ser desfeita.">
+                    <form method="post" class="inline-form" data-confirm="O projeto e TODOS os seus casos, execuções e defeitos serão excluídos. Esta ação não pode ser desfeita." data-confirm-title="Excluir projeto?" data-confirm-ok="Sim, excluir" data-confirm-type="danger">
                         <?= csrf_field() ?><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
                         <button class="btn btn-sm btn-danger" type="submit"><?= icon('trash', 14) ?></button>
                     </form>

@@ -138,7 +138,7 @@ if ($showForm):
                 <td><?= fmt_dt($p['created_at']) ?></td>
                 <td class="actions">
                     <button class="btn btn-sm btn-success" type="submit" form="ap-<?= (int)$p['id'] ?>"><?= icon('check', 14) ?> Aprovar</button>
-                    <form method="post" class="inline-form" data-confirm="Recusar esta solicitação de cadastro?">
+                    <form method="post" class="inline-form" data-confirm="A pessoa não poderá entrar no sistema com esta solicitação." data-confirm-title="Recusar cadastro?" data-confirm-ok="Recusar" data-confirm-type="warning">
                         <?= csrf_field() ?><input type="hidden" name="action" value="reject"><input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
                         <button class="btn btn-sm btn-danger" type="submit">Recusar</button>
                     </form>
@@ -170,7 +170,7 @@ if ($showForm):
                         <button class="btn btn-sm btn-ghost" type="submit"><?= $u['active'] ? 'Desativar' : 'Ativar' ?></button>
                     </form>
                     <?php endif; ?>
-                    <form method="post" class="inline-form" data-confirm="Excluir este usuário? Execuções e defeitos dele também serão removidos. Prefira desativar.">
+                    <form method="post" class="inline-form" data-confirm="Execuções e defeitos deste usuário também serão removidos. Se for só bloquear o acesso, prefira desativar." data-confirm-title="Excluir usuário?" data-confirm-ok="Sim, excluir" data-confirm-type="danger">
                         <?= csrf_field() ?><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= (int)$u['id'] ?>">
                         <button class="btn btn-sm btn-danger" type="submit"><?= icon('trash', 14) ?></button>
                     </form>

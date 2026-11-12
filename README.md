@@ -149,3 +149,8 @@ Ao registrar uma execução o tester informa o **Resultado** (Aprovado, Reprovad
 
 - **Voltar (seta)**: telas de detalhe (caso, execução, chamado, Ver Tudo, relatórios, formulários) têm o botão **Voltar** na barra superior. Ele volta à página de onde você veio; se isso não fizer sentido (ex.: acabou de salvar um formulário) ou sem JavaScript, vai para a página-mãe.
 - **Ver Tudo** (no caso de teste): abre a página com todas as execuções, evidências e defeitos daquele caso, com **Baixar PDF**, **Imprimir** e **Visão limpa**. Na Visão limpa o **Voltar** aparece junto dos botões do relatório.
+
+## Diálogos de confirmação e aviso
+
+Não são usados `alert`/`confirm` nativos do navegador. As confirmações (excluir projeto/suíte/caso/usuário, recusar cadastro, fechar chamado) abrem um **diálogo estilizado** no padrão do site (fundo desfocado, ícone, título, texto e botões; em exclusão o foco começa em *Cancelar*; Esc ou clique fora cancelam).
+Para criar uma confirmação nova basta usar `data-confirm="mensagem"` em um `<form>` (opcionais: `data-confirm-title`, `data-confirm-ok`, `data-confirm-type="danger|warning|info"`). Em JavaScript: `TL.confirm({...})` e `TL.alert({...})` (ambos retornam Promise); `window.alert()` também usa o diálogo.
