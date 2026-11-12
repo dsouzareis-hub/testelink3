@@ -13,8 +13,7 @@ $params = [$uid];
 if ($fProject) { $where[] = 'tc.project_id = ?'; $params[] = $fProject; }
 
 $rows = q("SELECT a.id aid, a.kanban_status, tc.id, tc.code, tc.title, tc.priority, p.name project, s.name suite,
-                  ex.id exec_id, ex.result, ex.exec_type, ex.executed_at,
-                  EXISTS(SELECT 1 FROM executions x WHERE x.case_id = tc.id AND x.tester_id = a.tester_id AND x.executed_at >= a.cycle_start) has_activity,
+                  ex.result, ex.executed_at,
                   (SELECT d.id FROM defects d WHERE d.case_id = tc.id AND d.status = 'retest' AND d.retest_tester_id = a.tester_id ORDER BY d.id DESC LIMIT 1) retest_defect
            FROM assignments a
            JOIN test_cases tc ON tc.id = a.case_id
@@ -62,35 +61,16 @@ include __DIR__ . '/includes/header.php';
             <article class="kb-card lvl-<?= e($r['priority']) ?>" draggable="true" data-id="<?= (int)$r['aid'] ?>" data-rank="<?= $rank[$r['priority']] ?>" data-status="<?= e($status) ?>">
                 <div class="kb-top">
                     <span class="kb-badge lvl-<?= e($r['priority']) ?>"><?= e(KANBAN_LEVELS[$r['priority']]) ?></span>
-                    <a class="kb-code" href="case_view.php?id=<?= (int)$r['id'] ?>" draggable="false"><?= e($r['code']) ?></a>
+                    <span class="kb-code"><?= e($r['code']) ?></span>
                 </div>
                 <h3><?= e($r['title']) ?></h3>
                 <p class="kb-meta"><?= e($r['project']) ?> · <?= e($r['suite']) ?></p>
                 <p class="kb-tags">
-                    <?php if ($r['result']): ?><span class="kb-res res-<?= e($r['result']) ?>">Último: <?= e(RESULTS[$r['result']]) ?></span>
-                        <span class="kb-res"><?= e(EXEC_TYPES[$r['exec_type']] ?? '') ?></span><?php endif; ?>
+                    <?php if ($r['result']): ?><span class="kb-res res-<?= e($r['result']) ?>">Último: <?= e(RESULTS[$r['result']]) ?></span><?php endif; ?>
                     <?php if ($r['retest_defect']): ?><span class="kb-res res-retest">Reteste · defeito #<?= (int)$r['retest_defect'] ?></span><?php endif; ?>
                 </p>
                 <div class="kb-actions">
-                    <a class="kb-btn" href="execute.php?case_id=<?= (int)$r['id'] ?><?= $r['retest_defect'] ? '&defect_id=' . (int)$r['retest_defect'] : '' ?>" draggable="false">
-                        <?= $r['retest_defect'] ? 'Reteste' : ($status === 'done' ? 'Reexecutar' : 'Executar') ?>
-                    </a>
-                    <?php if ($r['exec_id']): ?>
-                    <a class="kb-btn kb-btn-ghost kb-comment" href="execution_view.php?id=<?= (int)$r['exec_id'] ?>#comentarios" draggable="false">Comentar</a>
-                    <?php endif; ?>
-                    <form method="post" action="kanban_move.php" class="move-form">
-                        <?= csrf_field() ?>
-                        <input type="hidden" name="id" value="<?= (int)$r['aid'] ?>">
-                        <input type="hidden" name="project" value="<?= (int)$fProject ?>">
-                        <select name="status" aria-label="Mover <?= e($r['code']) ?> para">
-                            <?php foreach (KANBAN_COLUMNS as $k => $lbl):
-                                // Com atividade registrada (execução, comentário, foto) não dá para voltar para "Em aberto"
-                                $blocked = $k === 'waiting' && $r['has_activity'] && $status !== 'waiting'; ?>
-                                <option value="<?= e($k) ?>" <?= $k === $status ? 'selected' : '' ?> <?= $blocked ? 'disabled title="Já há atividade registrada neste teste"' : '' ?>><?= e($lbl) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                        <button type="submit" class="kb-btn kb-btn-ghost">Mover</button>
-                    </form>
+                    <a class="kb-btn" href="case_view.php?id=<?= (int)$r['id'] ?>" draggable="false">Ver</a>
                 </div>
             </article>
             <?php endforeach; ?>

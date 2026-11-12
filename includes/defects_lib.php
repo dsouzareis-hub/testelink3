@@ -62,7 +62,7 @@ function case_testers(int $caseId): array
 /**
  * Tomada de decisão do Admin: urgência + UM destino ('developer' ou 'tester').
  * - developer: chamado vai ao desenvolvedor escolhido (status "open").
- * - tester: chamado vai ao tester como Reteste (status "retest") e o cartão dele volta a "Aguardando" (novo ciclo).
+ * - tester: chamado vai ao tester como Reteste (status "retest") e o cartão dele entra direto em "Em Andamento" (novo ciclo).
  * Lança InvalidArgumentException com mensagem amigável em caso de erro.
  */
 function decide_defect(int $defectId, string $target, int $targetUserId, string $urgency, int $adminId): void
@@ -92,8 +92,8 @@ function decide_defect(int $defectId, string $target, int $targetUserId, string 
             throw new InvalidArgumentException('Selecione um tester atribuído a este caso.');
         }
         q("UPDATE defects SET retest_tester_id = ?, priority = ?, status = 'retest' WHERE id = ?", [$targetUserId, $urgency, $defectId]);
-        // O caso volta ao Kanban do tester como "Aguardando" (Reteste), iniciando um novo ciclo de execução
-        q("UPDATE assignments SET kanban_status = 'waiting', cycle_start = NOW(), done_at = NULL WHERE case_id = ? AND tester_id = ?", [$d['case_id'], $targetUserId]);
+        // O caso entra no Kanban do tester direto em "Em Andamento" (Reteste), iniciando um novo ciclo de execução
+        q("UPDATE assignments SET kanban_status = 'doing', cycle_start = NOW(), done_at = NULL WHERE case_id = ? AND tester_id = ?", [$d['case_id'], $targetUserId]);
         add_defect_comment($defectId, $adminId, 'Decisão do Administrador: enviado ao tester ' . $testers[$targetUserId] . ' para reteste — urgência ' . LEVELS[$urgency] . '.',
             $d['status'], 'retest');
         return;

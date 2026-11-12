@@ -18,16 +18,39 @@ $execs = q("SELECT ex.id, ex.result, ex.executed_at, ex.case_version, u.name tes
                    (SELECT COUNT(*) FROM evidences WHERE execution_id = ex.id) evs
             FROM executions ex JOIN users u ON u.id = ex.tester_id WHERE ex.case_id = ? $execWhere ORDER BY ex.id DESC", [$id])->fetchAll();
 
+// Tester: as decisões ficam aqui dentro (executar, reteste, comentar), não no cartão do Kanban
+$retestDefect = null;
+$kanbanStatus = null;
+if ($role === 'tester') {
+    $retestDefect = q("SELECT id, title FROM defects WHERE case_id = ? AND status = 'retest' AND retest_tester_id = ? ORDER BY id DESC LIMIT 1",
+        [$id, (int)$user['id']])->fetch() ?: null;
+    $kanbanStatus = q('SELECT kanban_status FROM assignments WHERE case_id = ? AND tester_id = ?', [$id, (int)$user['id']])->fetchColumn();
+    require __DIR__ . '/includes/kanban.php';
+}
+
 $pageTitle = $case['code'] . ' — ' . $case['title'];
 $active = $role === 'tester' ? 'my_tests.php' : 'cases.php';
 include __DIR__ . '/includes/header.php';
 ?>
+<?php if ($retestDefect): ?>
+<div class="alert alert-info">O Administrador enviou este caso para <strong>reteste</strong> — chamado
+    <a href="defect_view.php?id=<?= (int)$retestDefect['id'] ?>">#<?= (int)$retestDefect['id'] ?> — <?= e($retestDefect['title']) ?></a>.
+    Aprovado fecha o chamado; reprovado o reabre e volta ao Administrador.</div>
+<?php endif; ?>
 <div class="card">
     <div class="card-head">
         <h2><?= e($case['code']) ?> · <?= e($case['title']) ?> <small class="muted">v<?= (int)$case['version'] ?></small></h2>
         <div>
+            <?php if ($kanbanStatus): ?><?= badge('Kanban: ' . KANBAN_COLUMNS[$kanbanStatus], $kanbanStatus === 'done' ? 'green' : 'gray') ?><?php endif; ?>
             <?php if ($role === 'tester' && $case['status'] === 'active'): ?>
-                <a class="btn btn-success" href="execute.php?case_id=<?= $id ?>"><?= icon('play', 16) ?> Executar</a>
+                <?php if ($retestDefect): ?>
+                    <a class="btn btn-success" href="execute.php?case_id=<?= $id ?>&defect_id=<?= (int)$retestDefect['id'] ?>"><?= icon('play', 16) ?> Realizar reteste</a>
+                <?php else: ?>
+                    <a class="btn btn-success" href="execute.php?case_id=<?= $id ?>"><?= icon('play', 16) ?> <?= $execs ? 'Nova execução' : 'Executar' ?></a>
+                <?php endif; ?>
+                <?php if ($execs): ?>
+                    <a class="btn btn-ghost" href="execution_view.php?id=<?= (int)$execs[0]['id'] ?>#comentarios"><?= icon('edit', 16) ?> Comentar</a>
+                <?php endif; ?>
             <?php endif; ?>
             <?php if ($role === 'admin'): ?><a class="btn" href="case_form.php?id=<?= $id ?>"><?= icon('edit', 16) ?> Editar</a><?php endif; ?>
             <a class="btn btn-ghost" href="report_case.php?id=<?= $id ?>"><?= icon('printer', 16) ?> Relatório</a>
