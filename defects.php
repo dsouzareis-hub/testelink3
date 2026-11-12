@@ -20,16 +20,23 @@ if ($role === 'developer') {
     $where[] = '(d.reported_by = ? OR d.case_id IN (SELECT case_id FROM assignments WHERE tester_id = ?))';
     array_push($params, $uid, $uid);
 }
+if ($fProject) { $where[] = 'd.project_id = ?'; $params[] = $fProject; }
+if (isset(LEVELS[$fSeverity])) { $where[] = 'd.severity = ?'; $params[] = $fSeverity; }
+
+// Por padrão os chamados encerrados ficam ocultos (a página não é um histórico). "Mostrar Tudo" (?all=1) os inclui.
+$showAll = !empty($_GET['all']);
+$scopeWhere = $where;
+$scopeParams = $params;
 if ($fStatus === 'open_all') {
     $where[] = "d.status IN ('triage','open','fixing','fixed','retest','reopened')";
 } elseif ($fStatus === 'decision') {
     // Com o Admin, aguardando a tomada de decisão
     $where[] = "d.status IN ('triage','fixed','reopened')";
 } elseif (isset(DEFECT_STATUS[$fStatus])) {
-    $where[] = 'd.status = ?'; $params[] = $fStatus;
+    $where[] = 'd.status = ?'; $params[] = $fStatus;     // escolher "Fechado" no filtro mostra os fechados
+} elseif (!$showAll) {
+    $where[] = "d.status <> 'closed'";
 }
-if ($fProject) { $where[] = 'd.project_id = ?'; $params[] = $fProject; }
-if (isset(LEVELS[$fSeverity])) { $where[] = 'd.severity = ?'; $params[] = $fSeverity; }
 
 $rows = q('SELECT d.id, d.title, d.severity, d.priority, d.status, d.updated_at, tc.code, p.name project,
                   dev.name developer, rep.name reporter
@@ -37,14 +44,42 @@ $rows = q('SELECT d.id, d.title, d.severity, d.priority, d.status, d.updated_at,
            LEFT JOIN users dev ON dev.id = d.assigned_to JOIN users rep ON rep.id = d.reported_by
            WHERE ' . implode(' AND ', $where) . ' ORDER BY d.updated_at DESC LIMIT 300', $params)->fetchAll();
 
+// Quantos encerrados estão escondidos (mesmo escopo e filtros de projeto/severidade)
+$hiddenClosed = 0;
+if (!$showAll && !isset(DEFECT_STATUS[$fStatus]) && $fStatus !== 'open_all' && $fStatus !== 'decision') {
+    $hiddenClosed = (int)q("SELECT COUNT(*) FROM defects d WHERE d.status = 'closed' AND " . implode(' AND ', $scopeWhere), $scopeParams)->fetchColumn();
+}
+
+// Link do botão: alterna ?all=1 mantendo os demais filtros
+$toggleQs = $_GET;
+unset($toggleQs['all']);
+if (!$showAll) { $toggleQs['all'] = 1; }
+$toggleUrl = 'defects.php' . ($toggleQs ? '?' . http_build_query($toggleQs) : '');
+
 $pageTitle = 'Defeitos';
 $active = 'defects.php';
 include __DIR__ . '/includes/header.php';
 ?>
 <div class="card">
+    <div class="card-head">
+        <h2>Defeitos <small class="muted"><?= $showAll ? '(todos, incluindo encerrados)' : '(em andamento)' ?></small></h2>
+        <?php
+            $tip = $showAll
+                ? 'Volta a esconder os chamados já encerrados.'
+                : 'Exibe todos os chamados, incluindo os já encerrados.';
+            $label = $showAll ? 'Ocultar encerrados' : 'Mostrar Tudo';
+        ?>
+        <a class="btn <?= $showAll ? '' : 'btn-ghost' ?> tip" href="<?= e($toggleUrl) ?>" data-tip="<?= e($tip) ?>" aria-label="<?= e($label . ': ' . $tip) ?>">
+            <?= icon('eye', 16) ?> <?= e($label) ?>
+        </a>
+    </div>
+    <?php if ($hiddenClosed): ?>
+        <p class="muted" style="margin-top:0"><?= $hiddenClosed ?> chamado(s) encerrado(s) oculto(s). Use <strong>Mostrar Tudo</strong> para vê-los.</p>
+    <?php endif; ?>
     <form method="get" class="filters">
+        <?php if ($showAll): ?><input type="hidden" name="all" value="1"><?php endif; ?>
         <label class="field">Status
-            <select name="status"><?= options(['open_all' => 'Em aberto (exceto fechados)', 'decision' => 'Aguardando decisão do Admin'] + DEFECT_STATUS, $fStatus, true) ?></select>
+            <select name="status"><?= options(['open_all' => 'Em aberto (exceto fechados)', 'decision' => 'Aguardando decisão do Admin'] + DEFECT_STATUS, $fStatus, true, $showAll ? 'Todos (com encerrados)' : 'Todos (sem encerrados)') ?></select>
         </label>
         <label class="field">Severidade <select name="severity"><?= options(LEVELS, $fSeverity, true) ?></select></label>
         <?php if ($role !== 'developer'): ?>

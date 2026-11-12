@@ -5,9 +5,14 @@ $uid = (int)$user['id'];
 $role = $user['role'];
 
 $id = get_int('id');
-$d = q('SELECT d.*, tc.code, tc.title case_title, p.name project, dev.name developer, rep.name reporter
+// Autores: Teste = tester que reportou; Correção = dev responsável (ou o último que concluiu); Adm = quem criou o caso de teste
+$d = q('SELECT d.*, tc.code, tc.title case_title, p.name project, dev.name developer, rep.name reporter, adm.name case_author,
+               (SELECT u2.name FROM defect_comments c JOIN users u2 ON u2.id = c.user_id
+                 WHERE c.defect_id = d.id AND c.new_status = \'fixed\' ORDER BY c.id DESC LIMIT 1) fixer_name,
+               (SELECT c.created_at FROM defect_comments c WHERE c.defect_id = d.id AND c.new_status = \'fixed\' ORDER BY c.id DESC LIMIT 1) fixed_at
         FROM defects d JOIN test_cases tc ON tc.id = d.case_id JOIN projects p ON p.id = d.project_id
-        LEFT JOIN users dev ON dev.id = d.assigned_to JOIN users rep ON rep.id = d.reported_by WHERE d.id = ?', [$id])->fetch();
+        LEFT JOIN users dev ON dev.id = d.assigned_to LEFT JOIN users adm ON adm.id = tc.created_by
+        JOIN users rep ON rep.id = d.reported_by WHERE d.id = ?', [$id])->fetch();
 if (!$d) { not_found(); }
 // Desenvolvedor: depois de concluir, o chamado deixa de ser acessível a ele (volta ao Admin)
 if (!can_view_defect($user, $d)) { forbidden(); }
@@ -119,8 +124,14 @@ include __DIR__ . '/includes/header.php';
             <?php else: ?><a href="execution_view.php?id=<?= (int)$d['execution_id'] ?>">#<?= (int)$d['execution_id'] ?></a><?php endif; ?></dd>
         <dt>Severidade / Urgência</dt>
         <dd><?= level_badge($d['severity']) ?> <?= $d['status'] === 'triage' ? '<span class="muted">urgência definida no encaminhamento</span>' : level_badge($d['priority']) ?></dd>
-        <dt>Reportado por</dt><dd><?= e($d['reporter']) ?> em <?= fmt_dt($d['created_at']) ?></dd>
-        <dt>Desenvolvedor</dt><dd><?= $d['developer'] ? e($d['developer']) : '<span class="muted">Ainda não encaminhado</span>' ?></dd>
+        <dt>Autor do Teste</dt><dd><strong><?= e($d['reporter']) ?></strong> <span class="muted">· reportado em <?= fmt_dt($d['created_at']) ?></span></dd>
+        <dt>Autor da Correção</dt>
+        <dd><?php
+            // Quem concluiu a correção; se ainda não concluiu, o desenvolvedor responsável no momento
+            if ($d['fixer_name']): ?><strong><?= e($d['fixer_name']) ?></strong> <span class="muted">· concluiu em <?= fmt_dt($d['fixed_at']) ?></span>
+            <?php elseif ($d['developer']): ?><strong><?= e($d['developer']) ?></strong> <span class="muted">· responsável, correção em andamento</span>
+            <?php else: ?><span class="muted">Ainda não encaminhado ao desenvolvedor</span><?php endif; ?></dd>
+        <dt>Autor Adm</dt><dd><?= $d['case_author'] ? '<strong>' . e($d['case_author']) . '</strong> <span class="muted">· criou o caso de teste ' . e($d['code']) . '</span>' : '<span class="muted">—</span>' ?></dd>
         <?php if ($retestTester && $d['status'] === 'retest'): ?><dt>Reteste com</dt><dd><?= e($retestTester) ?></dd><?php endif; ?>
         <dt>Relato do tester</dt><dd class="pre"><?= e($d['description']) ?></dd>
         <dt>Evidências do teste</dt><dd><?= evidence_gallery($evidences) ?></dd>

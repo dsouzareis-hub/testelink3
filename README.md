@@ -77,6 +77,9 @@ testlink/
 7. **Reteste** (tester escolhido pelo Admin): aprovado → chamado **Fechado**; reprovado → **Reaberto** (volta ao Admin para nova decisão).
 8. Admin/usuário de leitura gera e imprime os relatórios.
 
+> **Página Defeitos**: por padrão não lista chamados encerrados (não é um histórico). O botão **Mostrar Tudo**, no canto direito, inclui os encerrados (a dica ao passar o mouse explica; o filtro Status = Fechado também os mostra).
+> **Card do chamado**: mostra **Autor do Teste** (tester que reportou), **Autor da Correção** (dev que concluiu ou o responsável atual) e **Autor Adm** (quem criou o caso de teste).
+
 > O desenvolvedor não tem a opção *Reaberto*: ela só ocorre automaticamente quando o reteste reprova. O Admin também pode fechar um chamado manualmente. Chamados *Aguardando triagem*, *Concluído pelo Dev* e *Reaberto* aparecem no dashboard do Admin como "aguardando decisão".
 
 ## Cadastro com aprovação do administrador
