@@ -170,6 +170,25 @@
         });
     })();
 
+    // Tomada de decisão: mostra só o seletor do destino escolhido (Desenvolvedor OU Tester)
+    document.querySelectorAll('[data-decision]').forEach(function (form) {
+        var panels = form.querySelectorAll('[data-target-panel]');
+        function sync() {
+            var chosen = form.querySelector('input[name="target"]:checked');
+            var value = chosen ? chosen.value : '';
+            panels.forEach(function (p) {
+                var on = p.getAttribute('data-target-panel') === value;
+                p.hidden = !on;
+                p.querySelectorAll('select').forEach(function (s) { s.disabled = !on; });
+            });
+            form.querySelectorAll('.choice').forEach(function (c) {
+                c.classList.toggle('on', c.querySelector('input').checked);
+            });
+        }
+        form.addEventListener('change', sync);
+        sync();
+    });
+
     // Marcar/desmarcar todos (atribuições)
     var all = document.querySelector('[data-check-all]');
     if (all) {

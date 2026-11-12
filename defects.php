@@ -19,7 +19,10 @@ if ($role === 'developer') {
     array_push($params, $uid, $uid);
 }
 if ($fStatus === 'open_all') {
-    $where[] = "d.status IN ('triage','open','fixing','reopened')";
+    $where[] = "d.status IN ('triage','open','fixing','fixed','retest','reopened')";
+} elseif ($fStatus === 'decision') {
+    // Com o Admin, aguardando a tomada de decisão
+    $where[] = "d.status IN ('triage','fixed','reopened')";
 } elseif (isset(DEFECT_STATUS[$fStatus])) {
     $where[] = 'd.status = ?'; $params[] = $fStatus;
 }
@@ -39,7 +42,7 @@ include __DIR__ . '/includes/header.php';
 <div class="card">
     <form method="get" class="filters">
         <label class="field">Status
-            <select name="status"><?= options(['open_all' => 'Abertos (aberto/em correção/reaberto)'] + DEFECT_STATUS, $fStatus, true) ?></select>
+            <select name="status"><?= options(['open_all' => 'Em aberto (exceto fechados)', 'decision' => 'Aguardando decisão do Admin'] + DEFECT_STATUS, $fStatus, true) ?></select>
         </label>
         <label class="field">Severidade <select name="severity"><?= options(LEVELS, $fSeverity, true) ?></select></label>
         <?php if ($role !== 'developer'): ?>

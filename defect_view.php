@@ -23,11 +23,12 @@ if (is_post()) {
     csrf_check();
     $action = post('action');
 
-    /* ---- Admin: encaminhar ao desenvolvedor (somente urgência + desenvolvedor) ---- */
-    if ($isAdmin && $action === 'forward') {
+    /* ---- Admin: tomada de decisão (urgência + UM destino: desenvolvedor OU tester/reteste) ---- */
+    if ($isAdmin && $action === 'decide') {
+        $target = post('target');
         try {
-            forward_defect($id, post_int('developer_id'), post('urgency'), $uid);
-            flash('success', 'Chamado encaminhado ao desenvolvedor.');
+            decide_defect($id, $target, post_int($target === 'tester' ? 'tester_id' : 'developer_id'), post('urgency'), $uid);
+            flash('success', $target === 'tester' ? 'Chamado enviado ao tester para reteste.' : 'Chamado encaminhado ao desenvolvedor.');
         } catch (InvalidArgumentException $e) {
             flash('error', $e->getMessage());
         }
@@ -81,8 +82,11 @@ foreach (q('SELECT id, comment_id, original_name FROM defect_attachments WHERE d
     $attByComment[(int)$a['comment_id']][] = $a;
 }
 $evidences = execution_evidences((int)$d['execution_id']);
-$canRetest = $role === 'tester' && $d['status'] === 'fixed' && tester_has_case($uid, (int)$d['case_id']);
+// Reteste: só o tester escolhido pelo Admin na tomada de decisão
+$canRetest = $role === 'tester' && $d['status'] === 'retest' && (int)$d['retest_tester_id'] === $uid && tester_has_case($uid, (int)$d['case_id']);
 $devs = $isAdmin ? users_by_role('developer') : [];
+$testers = $isAdmin ? case_testers((int)$d['case_id']) : [];
+$retestTester = $d['retest_tester_id'] ? q('SELECT name FROM users WHERE id = ?', [$d['retest_tester_id']])->fetchColumn() : null;
 
 $pageTitle = 'Chamado #' . $id;
 $active = $isDev ? 'dev_board.php' : 'defects.php';
@@ -110,29 +114,60 @@ include __DIR__ . '/includes/header.php';
         <dd><?= level_badge($d['severity']) ?> <?= $d['status'] === 'triage' ? '<span class="muted">urgência definida no encaminhamento</span>' : level_badge($d['priority']) ?></dd>
         <dt>Reportado por</dt><dd><?= e($d['reporter']) ?> em <?= fmt_dt($d['created_at']) ?></dd>
         <dt>Desenvolvedor</dt><dd><?= $d['developer'] ? e($d['developer']) : '<span class="muted">Ainda não encaminhado</span>' ?></dd>
+        <?php if ($retestTester && $d['status'] === 'retest'): ?><dt>Reteste com</dt><dd><?= e($retestTester) ?></dd><?php endif; ?>
         <dt>Relato do tester</dt><dd class="pre"><?= e($d['description']) ?></dd>
         <dt>Evidências do teste</dt><dd><?= evidence_gallery($evidences) ?></dd>
     </dl>
 </div>
 
-<?php if ($isAdmin && $d['status'] !== 'closed'): ?>
+<?php if ($isAdmin && $d['status'] !== 'closed'):
+    // Sugestão de destino: quando o dev devolveu o chamado, o passo natural é o reteste; nos demais casos, o desenvolvedor
+    $defaultTarget = ($d['status'] === 'fixed' && $testers) || !$devs ? 'tester' : 'developer';
+    if ($defaultTarget === 'tester' && !$testers) { $defaultTarget = 'developer'; }
+?>
 <div class="card">
-    <h3><?= in_array($d['status'], ['triage'], true) ? 'Encaminhar para o Desenvolvedor' : 'Reencaminhar para o Desenvolvedor' ?></h3>
-    <?php if (!$devs): ?>
-        <p class="alert alert-warn">Não há desenvolvedores ativos. <a href="users.php?new=1">Cadastre ou aprove um usuário</a> com perfil Desenvolvedor.</p>
+    <div class="card-head">
+        <h3 style="margin:0">Tomada de decisão</h3>
+        <span class="muted">Situação atual: <?= defect_badge($d['status']) ?></span>
+    </div>
+    <p class="muted" style="margin-top:0">Defina a urgência e escolha <strong>um</strong> destino: o <strong>Desenvolvedor</strong> corrige e devolve o chamado a você;
+        o <strong>Tester</strong> recebe o caso de volta no Kanban como <strong>Reteste</strong> (pode ser já na triagem).</p>
+    <?php if (!$devs && !$testers): ?>
+        <p class="alert alert-warn">Não há desenvolvedor ativo nem tester atribuído ao caso. <a href="users.php">Cadastre/aprove usuários</a> ou <a href="assignments.php?project=<?= (int)$d['project_id'] ?>">atribua o caso a um tester</a>.</p>
     <?php else: ?>
-    <form method="post" class="filters" style="margin-bottom:0">
-        <?= csrf_field() ?><input type="hidden" name="action" value="forward">
-        <label class="field">Urgência
+    <form method="post" data-decision>
+        <?= csrf_field() ?><input type="hidden" name="action" value="decide">
+        <label class="field" style="max-width:260px">Urgência
             <select name="urgency" required><?= options(LEVELS, $d['status'] === 'triage' ? 'medium' : $d['priority']) ?></select>
         </label>
-        <label class="field">Desenvolvedor
-            <select name="developer_id" required><?= options($devs, $d['assigned_to']) ?></select>
-        </label>
-        <button class="btn" type="submit"><?= icon('send', 16) ?> Encaminhar</button>
+        <div class="decision-choice" role="radiogroup" aria-label="Destino do chamado">
+            <label class="choice <?= $devs ? '' : 'off' ?>">
+                <input type="radio" name="target" value="developer" <?= $defaultTarget === 'developer' ? 'checked' : '' ?> <?= $devs ? '' : 'disabled' ?>>
+                <span><strong><?= icon('bug', 16) ?> Desenvolvedor</strong><small>Corrige e devolve o chamado para a sua decisão.<?= $devs ? '' : ' Nenhum desenvolvedor ativo.' ?></small></span>
+            </label>
+            <label class="choice <?= $testers ? '' : 'off' ?>">
+                <input type="radio" name="target" value="tester" <?= $defaultTarget === 'tester' ? 'checked' : '' ?> <?= $testers ? '' : 'disabled' ?>>
+                <span><strong><?= icon('play', 16) ?> Tester — Reteste</strong><small>O caso volta ao Kanban do tester como Reteste.<?= $testers ? '' : ' Nenhum tester atribuído ao caso.' ?></small></span>
+            </label>
+        </div>
+        <?php if ($devs): ?>
+        <div data-target-panel="developer">
+            <label class="field" style="max-width:360px">Desenvolvedor
+                <select name="developer_id"><?= options($devs, $d['assigned_to']) ?></select>
+            </label>
+        </div>
+        <?php endif; ?>
+        <?php if ($testers): ?>
+        <div data-target-panel="tester">
+            <label class="field" style="max-width:360px">Tester
+                <select name="tester_id"><?= options($testers, $d['retest_tester_id'] ?: $d['reported_by']) ?></select>
+            </label>
+        </div>
+        <?php endif; ?>
+        <div class="form-actions"><button class="btn" type="submit"><?= icon('check', 16) ?> Confirmar decisão</button></div>
     </form>
     <?php endif; ?>
-    <form method="post" data-confirm="Fechar este chamado?" style="margin-top:14px">
+    <form method="post" data-confirm="Fechar este chamado sem encaminhar?" style="margin-top:14px">
         <?= csrf_field() ?><input type="hidden" name="action" value="close">
         <button class="btn btn-ghost btn-sm" type="submit">Fechar chamado sem encaminhar</button>
     </form>

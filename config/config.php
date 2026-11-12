@@ -4,7 +4,8 @@
  * Ajuste as credenciais do MySQL conforme o seu ambiente.
  */
 define('DB_HOST', 'localhost');
-define('DB_NAME', 'testlink3');
+// A variável de ambiente TESTLINK_DB permite apontar para outro banco (ex.: testes) sem editar este arquivo
+define('DB_NAME', getenv('TESTLINK_DB') ?: 'testlink3');
 define('DB_USER', 'root');
 define('DB_PASS', '');
 define('DB_CHARSET', 'utf8mb4');

@@ -49,13 +49,12 @@ $dCounts = array_fill_keys(array_keys(DEFECT_STATUS), 0);
 foreach (q("SELECT d.status, COUNT(*) c FROM defects d $dSql GROUP BY d.status", $dParams) as $r) {
     $dCounts[$r['status']] = (int)$r['c'];
 }
-$openDefects = $dCounts['triage'] + $dCounts['open'] + $dCounts['fixing'] + $dCounts['reopened'];
+$openDefects = array_sum(array_intersect_key($dCounts, array_flip(OPEN_DEFECT_STATUS)));
 // Dev: chamados que ele já concluiu (histórico; ele não tem mais acesso a eles)
 $devDone = $role === 'developer'
     ? (int)q("SELECT COUNT(DISTINCT defect_id) FROM defect_comments WHERE user_id = ? AND new_status = 'fixed'", [$uid])->fetchColumn() : 0;
-// Admin: chamados esperando encaminhamento (novos reprovados e reabertos pelo reteste) e devolvidos pelo dev
-$toForward = $role === 'admin' ? (int)q("SELECT COUNT(*) FROM defects WHERE status IN ('triage','reopened')")->fetchColumn() : 0;
-$returned = $role === 'admin' ? (int)q("SELECT COUNT(*) FROM defects WHERE status = 'fixed'")->fetchColumn() : 0;
+// Admin: chamados aguardando tomada de decisão (novos reprovados, concluídos pelo dev e reabertos pelo reteste)
+$toDecide = $role === 'admin' ? (int)q("SELECT COUNT(*) FROM defects WHERE status IN ('triage','fixed','reopened')")->fetchColumn() : 0;
 
 $recentDefects = q("SELECT d.id, d.title, d.status, d.severity, d.updated_at, tc.code
                     FROM defects d JOIN test_cases tc ON tc.id = d.case_id $dSql
@@ -80,13 +79,9 @@ $pageTitle = 'Dashboard';
 $active = 'dashboard.php';
 include __DIR__ . '/includes/header.php';
 ?>
-<?php if ($toForward): ?>
-<div class="alert alert-warn"><?= $toForward ?> chamado(s) aguardando encaminhamento ao desenvolvedor.
-    <a href="defects.php?status=triage"><strong>Encaminhar agora</strong></a></div>
-<?php endif; ?>
-<?php if ($returned): ?>
-<div class="alert alert-info"><?= $returned ?> chamado(s) concluído(s) pelo desenvolvedor e devolvido(s) ao Administrador (reteste pelo tester).
-    <a href="defects.php?status=fixed"><strong>Ver</strong></a></div>
+<?php if ($toDecide): ?>
+<div class="alert alert-warn"><?= $toDecide ?> chamado(s) aguardando a sua tomada de decisão (desenvolvedor ou reteste).
+    <a href="defects.php?status=decision"><strong>Decidir agora</strong></a></div>
 <?php endif; ?>
 <?php if ($pendingUsers): ?>
 <div class="alert alert-warn"><?= $pendingUsers ?> solicitação(ões) de cadastro aguardando aprovação.

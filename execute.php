@@ -16,7 +16,8 @@ if ($case['status'] !== 'active') {
 // Reteste: defeito corrigido vinculado a este caso
 $retest = null;
 if ($defectId = get_int('defect_id')) {
-    $retest = q("SELECT * FROM defects WHERE id = ? AND case_id = ? AND status = 'fixed'", [$defectId, $caseId])->fetch() ?: null;
+    // Reteste só vale quando o Admin enviou o chamado a ESTE tester (status "retest")
+    $retest = q("SELECT * FROM defects WHERE id = ? AND case_id = ? AND status = 'retest' AND retest_tester_id = ?", [$defectId, $caseId, $uid])->fetch() ?: null;
 }
 
 if (is_post()) {
@@ -48,7 +49,7 @@ if (is_post()) {
             }
             if ($retest) {
                 // Reteste: aprovado fecha o defeito; reprovado reabre; bloqueado só comenta
-                $newStatus = ['passed' => 'closed', 'failed' => 'reopened'][$result] ?? 'fixed';
+                $newStatus = ['passed' => 'closed', 'failed' => 'reopened'][$result] ?? 'retest';
                 set_defect_status((int)$retest['id'], $newStatus, $uid,
                     'Reteste (execução #' . $execId . '): ' . RESULTS[$result] . ($notes ? ' — ' . $notes : ''));
             }

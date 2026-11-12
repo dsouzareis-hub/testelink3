@@ -8,7 +8,7 @@ $includeAll = !empty($_GET['all']);
 
 $where = [];
 $params = [];
-if (!$includeAll) { $where[] = "d.status IN ('triage','open','fixing','reopened')"; }
+if (!$includeAll) { $where[] = "d.status IN ('triage','open','fixing','fixed','retest','reopened')"; }
 if ($fProject) { $where[] = 'd.project_id = ?'; $params[] = $fProject; }
 if (isset(LEVELS[$fSeverity])) { $where[] = 'd.severity = ?'; $params[] = $fSeverity; }
 

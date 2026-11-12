@@ -137,9 +137,11 @@ CREATE TABLE defects (
     severity     ENUM('low','medium','high','critical') NOT NULL DEFAULT 'medium',
     priority     ENUM('low','medium','high','critical') NOT NULL DEFAULT 'medium',
     -- triage = reprovado pelo tester, aguardando o Admin encaminhar; assigned_to só é preenchido ao encaminhar
-    status       ENUM('triage','open','fixing','fixed','reopened','closed') NOT NULL DEFAULT 'triage',
+    -- fixed = concluído pelo dev (volta ao Admin decidir); retest = Admin enviou ao tester para reteste
+    status       ENUM('triage','open','fixing','fixed','retest','reopened','closed') NOT NULL DEFAULT 'triage',
     reported_by  INT UNSIGNED NOT NULL,
     assigned_to  INT UNSIGNED NULL,
+    retest_tester_id INT UNSIGNED NULL,
     created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     KEY idx_defect_status (status),
@@ -147,7 +149,8 @@ CREATE TABLE defects (
     FOREIGN KEY (case_id)      REFERENCES test_cases(id) ON DELETE CASCADE,
     FOREIGN KEY (project_id)   REFERENCES projects(id)   ON DELETE CASCADE,
     FOREIGN KEY (reported_by)  REFERENCES users(id)      ON DELETE CASCADE,
-    FOREIGN KEY (assigned_to)  REFERENCES users(id)      ON DELETE CASCADE
+    FOREIGN KEY (assigned_to)  REFERENCES users(id)      ON DELETE CASCADE,
+    FOREIGN KEY (retest_tester_id) REFERENCES users(id)  ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 CREATE TABLE defect_comments (

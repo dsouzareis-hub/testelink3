@@ -70,12 +70,14 @@ testlink/
 2. Admin atribui casos ao tester em **Atribuições**.
 3. Tester abre **Meus Testes → Executar**, escolhe o resultado, escreve o assentamento e anexa prints.
 4. Se **Reprovado**, o tester explica no assentamento e anexa fotos se quiser. O sistema abre o chamado como **Aguardando triagem** (o tester não escolhe desenvolvedor).
-5. O **Admin** abre o chamado e usa *Encaminhar para o Desenvolvedor*: apenas dois selects, **urgência** e **desenvolvedor** (sem campo de comentário). O chamado fica **Aberto**.
-6. O **Desenvolvedor** vê o chamado no seu Kanban, trabalha (Aberto ⇄ Em andamento), comenta e anexa fotos, e **conclui**. Ao concluir ele perde o acesso e o chamado volta ao Admin (status *Concluído pelo Dev*).
-7. O caso volta ao Kanban do tester como *Aguardando* para o **reteste**: aprovado → chamado **Fechado**; reprovado → **Reaberto** (volta ao Admin, que reencaminha).
+5. **Tomada de Decisão (Admin)**: o Admin abre o chamado, ajusta a **urgência** e escolhe **um** destino (sem campo de comentário):
+   - **Desenvolvedor** → status *Aberto*; ou
+   - **Tester — Reteste** → o caso volta ao Kanban do tester como **Reteste** (já possível na triagem, sem passar pelo dev).
+6. O **Desenvolvedor** vê o chamado no seu Kanban, trabalha (Aberto ⇄ Em andamento), comenta e anexa fotos, e **conclui**. Ao concluir ele perde o acesso e o chamado volta ao Admin (*Concluído pelo Dev*), que toma uma **nova decisão**: de novo ao dev ou ao tester para reteste.
+7. **Reteste** (tester escolhido pelo Admin): aprovado → chamado **Fechado**; reprovado → **Reaberto** (volta ao Admin para nova decisão).
 8. Admin/usuário de leitura gera e imprime os relatórios.
 
-> O desenvolvedor não tem a opção *Reaberto*: ela só ocorre automaticamente quando o reteste reprova. O Admin também pode fechar um chamado manualmente.
+> O desenvolvedor não tem a opção *Reaberto*: ela só ocorre automaticamente quando o reteste reprova. O Admin também pode fechar um chamado manualmente. Chamados *Aguardando triagem*, *Concluído pelo Dev* e *Reaberto* aparecem no dashboard do Admin como "aguardando decisão".
 
 ## Cadastro com aprovação do administrador
 
@@ -97,7 +99,8 @@ A tela Meus Testes é um quadro Kanban escuro (preto/grafite com vermelho) com a
 - Quando um defeito do caso é marcado como **Corrigido**, o cartão volta para Aguardando (reteste) e começa um novo ciclo.
 - **Criticidade** (prioridade do caso) em etiquetas vermelhas de intensidade crescente: Baixo < Médio < Alto < Crítico (o mais vibrante, com brilho).
 
-> Já instalou antes? Execute uma vez, nesta ordem, `migration_registro.sql`, `migration_kanban.sql` e `migration_fluxo.sql` no banco `testlink3`.
+> Já instalou antes? Execute uma vez, nesta ordem, `migration_registro.sql`, `migration_kanban.sql`, `migration_fluxo.sql` e `migration_decisao.sql` no banco `testlink3` (nenhuma apaga dados).
+> Para rodar testes sem tocar no seu banco, aponte para outro com a variável de ambiente `TESTLINK_DB`.
 
 ## Relatórios
 

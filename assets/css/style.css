@@ -98,6 +98,17 @@ code { background: var(--gray-bg); padding: 1px 5px; border-radius: 4px; font-si
 .badge-blue { background: var(--blue-bg); color: var(--blue); }
 .badge-teal { background: var(--teal-bg); color: var(--teal); }
 .badge-gray { background: var(--gray-bg); color: var(--gray); }
+.badge-purple { background: #ede9fe; color: #6d28d9; }
+
+/* Tomada de decisão (Admin): escolha de um destino */
+.decision-choice { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 14px 0; }
+.choice { display: flex; gap: 10px; align-items: flex-start; border: 2px solid var(--border); border-radius: 10px; padding: 12px 14px; cursor: pointer; background: #fff; font-weight: 400; }
+.choice input { margin-top: 3px; width: auto; }
+.choice strong { display: block; }
+.choice small { color: var(--muted); }
+.choice.on { border-color: var(--primary); background: var(--primary-soft); }
+.choice.off { opacity: .55; cursor: not-allowed; }
+@media (max-width: 640px) { .decision-choice { grid-template-columns: 1fr; } }
 
 /* Tabelas */
 .table-wrap { overflow-x: auto; }

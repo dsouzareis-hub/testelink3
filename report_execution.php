@@ -15,7 +15,7 @@ if ($fTo)   { $where[] = 'ex.executed_at <= ?'; $params[] = $fTo . ' 23:59:59'; 
 
 $rows = q('SELECT tc.code, tc.title, tc.priority, p.name project, s.name suite,
                   ex.id exec_id, ex.result, ex.executed_at, u.name tester,
-                  (SELECT COUNT(*) FROM defects d WHERE d.case_id = tc.id AND d.status IN (\'triage\',\'open\',\'fixing\',\'reopened\')) open_defects
+                  (SELECT COUNT(*) FROM defects d WHERE d.case_id = tc.id AND d.status IN (\'triage\',\'open\',\'fixing\',\'fixed\',\'retest\',\'reopened\')) open_defects
            FROM test_cases tc JOIN projects p ON p.id = tc.project_id JOIN suites s ON s.id = tc.suite_id
            LEFT JOIN executions ex ON ex.id = (SELECT MAX(id) FROM executions WHERE case_id = tc.id)
            LEFT JOIN users u ON u.id = ex.tester_id

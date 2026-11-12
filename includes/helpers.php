@@ -102,10 +102,12 @@ const RESULTS = ['passed' => 'Aprovado', 'failed' => 'Reprovado', 'blocked' => '
 const LEVELS = ['low' => 'Baixa', 'medium' => 'Média', 'high' => 'Alta', 'critical' => 'Crítica'];
 const DEFECT_STATUS = [
     'triage' => 'Aguardando triagem', 'open' => 'Aberto', 'fixing' => 'Em andamento',
-    'fixed' => 'Concluído pelo Dev', 'reopened' => 'Reaberto', 'closed' => 'Fechado',
+    'fixed' => 'Concluído pelo Dev', 'retest' => 'Reteste (Tester)', 'reopened' => 'Reaberto', 'closed' => 'Fechado',
 ];
-/** Status considerados "defeito aberto" nos relatórios e dashboard. */
-const OPEN_DEFECT_STATUS = ['triage', 'open', 'fixing', 'reopened'];
+/** Status considerados "defeito em aberto" (tudo que ainda não foi fechado) nos relatórios e dashboard. */
+const OPEN_DEFECT_STATUS = ['triage', 'open', 'fixing', 'fixed', 'retest', 'reopened'];
+/** Status em que o chamado está com o Admin, aguardando a tomada de decisão. */
+const DECISION_DEFECT_STATUS = ['triage', 'fixed', 'reopened'];
 
 function badge(string $text, string $class): string
 {
@@ -129,7 +131,7 @@ function level_badge(string $l): string
 
 function defect_badge(string $s): string
 {
-    $map = ['triage' => 'amber', 'open' => 'red', 'fixing' => 'blue', 'fixed' => 'teal', 'reopened' => 'amber', 'closed' => 'gray'];
+    $map = ['triage' => 'amber', 'open' => 'red', 'fixing' => 'blue', 'fixed' => 'teal', 'retest' => 'purple', 'reopened' => 'amber', 'closed' => 'gray'];
     return badge(DEFECT_STATUS[$s] ?? $s, $map[$s] ?? 'gray');
 }
 

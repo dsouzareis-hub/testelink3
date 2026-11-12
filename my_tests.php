@@ -12,7 +12,7 @@ if ($fProject) { $where[] = 'tc.project_id = ?'; $params[] = $fProject; }
 
 $rows = q("SELECT a.id aid, a.kanban_status, tc.id, tc.code, tc.title, tc.priority, p.name project, s.name suite,
                   ex.result, ex.executed_at,
-                  (SELECT d.id FROM defects d WHERE d.case_id = tc.id AND d.status = 'fixed' ORDER BY d.id DESC LIMIT 1) retest_defect
+                  (SELECT d.id FROM defects d WHERE d.case_id = tc.id AND d.status = 'retest' AND d.retest_tester_id = a.tester_id ORDER BY d.id DESC LIMIT 1) retest_defect
            FROM assignments a
            JOIN test_cases tc ON tc.id = a.case_id
            JOIN projects p ON p.id = tc.project_id

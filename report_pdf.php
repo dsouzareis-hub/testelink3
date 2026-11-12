@@ -39,7 +39,7 @@ function cell_level(string $l): array
 
 function cell_defect(string $s): array
 {
-    $map = ['triage' => [[146, 64, 14], [254, 243, 199]], 'open' => [[153, 27, 27], [254, 226, 226]], 'fixing' => [[30, 64, 175], [219, 234, 254]],
+    $map = ['retest' => [[109, 40, 217], [237, 233, 254]], 'triage' => [[146, 64, 14], [254, 243, 199]], 'open' => [[153, 27, 27], [254, 226, 226]], 'fixing' => [[30, 64, 175], [219, 234, 254]],
             'fixed' => [[15, 118, 110], [204, 251, 241]], 'reopened' => [[146, 64, 14], [254, 243, 199]],
             'closed' => [[75, 85, 99], [229, 231, 235]]];
     [$fg, $bg] = $map[$s];
@@ -79,7 +79,7 @@ if ($type === 'execution') {
     if ($fTo) { $where[] = 'ex.executed_at <= ?'; $params[] = $fTo . ' 23:59:59'; }
 
     $rows = q('SELECT tc.code, tc.title, p.name project, s.name suite, ex.result, ex.executed_at, u.name tester,
-                      (SELECT COUNT(*) FROM defects d WHERE d.case_id = tc.id AND d.status IN (\'triage\',\'open\',\'fixing\',\'reopened\')) open_defects
+                      (SELECT COUNT(*) FROM defects d WHERE d.case_id = tc.id AND d.status IN (\'triage\',\'open\',\'fixing\',\'fixed\',\'retest\',\'reopened\')) open_defects
                FROM test_cases tc JOIN projects p ON p.id = tc.project_id JOIN suites s ON s.id = tc.suite_id
                LEFT JOIN executions ex ON ex.id = (SELECT MAX(id) FROM executions WHERE case_id = tc.id)
                LEFT JOIN users u ON u.id = ex.tester_id
@@ -167,7 +167,7 @@ if ($type === 'defects') {
     $includeAll = !empty($_GET['all']);
     $where = [];
     $params = [];
-    if (!$includeAll) { $where[] = "d.status IN ('triage','open','fixing','reopened')"; }
+    if (!$includeAll) { $where[] = "d.status IN ('triage','open','fixing','fixed','retest','reopened')"; }
     if ($fProject) { $where[] = 'd.project_id = ?'; $params[] = $fProject; }
     if (isset(LEVELS[$fSeverity])) { $where[] = 'd.severity = ?'; $params[] = $fSeverity; }
     $rows = q('SELECT d.id, d.title, d.severity, d.priority, d.status, d.created_at, tc.code, p.name project, dev.name developer
@@ -181,7 +181,7 @@ if ($type === 'defects') {
     filter_line($pdf, [
         $fProject ? 'Projeto: ' . ($projects[$fProject] ?? '') : '',
         isset(LEVELS[$fSeverity]) ? 'Severidade: ' . LEVELS[$fSeverity] : '',
-        $includeAll ? 'Todos os status' : 'Somente abertos (aberto, em correção, reaberto)',
+        $includeAll ? 'Todos os status' : 'Somente em aberto (todos, exceto fechados)',
     ]);
     $pdf->stats([
         [count($rows), 'Defeitos', C_BLUE], [$bySev['critical'], 'Críticos', C_RED], [$bySev['high'], 'Altos', C_AMBER],
