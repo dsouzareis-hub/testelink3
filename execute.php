@@ -83,6 +83,7 @@ $prev = q('SELECT ex.id, ex.result, ex.executed_at, u.name tester FROM execution
 
 $pageTitle = ($retest ? 'Reteste: ' : 'Executar: ') . $case['code'];
 $active = 'my_tests.php';
+$backUrl = 'case_view.php?id=' . $caseId;
 include __DIR__ . '/includes/header.php';
 ?>
 <div class="card">

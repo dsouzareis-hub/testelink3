@@ -12,11 +12,12 @@ $execs = q('SELECT ex.*, u.name tester FROM executions ex JOIN users u ON u.id =
             WHERE ex.case_id = ? ORDER BY ex.id DESC', [$id])->fetchAll();
 $defects = q('SELECT id, title, status, severity, execution_id FROM defects WHERE case_id = ? ORDER BY id', [$id])->fetchAll();
 
-$pageTitle = 'Relatório do Caso ' . $case['code'];
+$pageTitle = 'Ver Tudo · ' . $case['code'];          // título da tela; a impressão usa "Relatório do Caso …"
 $active = $user['role'] === 'tester' ? 'my_tests.php' : 'cases.php';
+$backUrl = 'case_view.php?id=' . $id;
 include __DIR__ . '/includes/header.php';
 ?>
-<?php report_toolbar($pageTitle, 'case'); ?>
+<?php report_toolbar('Relatório do Caso ' . $case['code'], 'case'); ?>
 
 <div class="card">
     <h2><?= e($case['code']) ?> · <?= e($case['title']) ?> <small class="muted">v<?= (int)$case['version'] ?></small></h2>

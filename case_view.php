@@ -30,6 +30,7 @@ if ($role === 'tester') {
 
 $pageTitle = $case['code'] . ' — ' . $case['title'];
 $active = $role === 'tester' ? 'my_tests.php' : 'cases.php';
+$backUrl = $role === 'tester' ? 'my_tests.php' : 'cases.php';
 include __DIR__ . '/includes/header.php';
 ?>
 <?php if ($retestDefect): ?>
@@ -53,7 +54,7 @@ include __DIR__ . '/includes/header.php';
                 <?php endif; ?>
             <?php endif; ?>
             <?php if ($role === 'admin'): ?><a class="btn" href="case_form.php?id=<?= $id ?>"><?= icon('edit', 16) ?> Editar</a><?php endif; ?>
-            <a class="btn btn-ghost" href="report_case.php?id=<?= $id ?>"><?= icon('printer', 16) ?> Relatório</a>
+            <a class="btn btn-ghost" href="report_case.php?id=<?= $id ?>" title="Todas as execuções, evidências e defeitos deste caso — com Imprimir e Baixar PDF"><?= icon('eye', 16) ?> Ver Tudo</a>
         </div>
     </div>
     <dl class="detail-grid">

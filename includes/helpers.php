@@ -203,6 +203,7 @@ function icon(string $name, int $size = 18): string
         'eye'      => '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
         'upload'   => '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>',
         'download' => '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
+        'arrow-left' => '<line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>',
         'clock'    => '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
     ];
     $p = $paths[$name] ?? '';
@@ -243,9 +244,20 @@ function nav_items(string $role): array
     }
 }
 
-/** Cabeçalho padrão dos relatórios (botões de imprimir / visão limpa). */
+/**
+ * Botão "Voltar" (seta). Volta à página anterior pelo histórico do navegador (assets/js/app.js);
+ * sem JavaScript, ou quando a página anterior não serve (ex.: formulário recém-enviado), vai para $fallback.
+ */
+function back_button(string $fallback, string $extraClass = ''): string
+{
+    return '<a href="' . e($fallback) . '" class="btn btn-ghost btn-back ' . e($extraClass) . '" data-back title="Voltar à página anterior">'
+        . icon('arrow-left', 16) . ' <span>Voltar</span></a>';
+}
+
+/** Cabeçalho padrão dos relatórios (botões de voltar / baixar PDF / imprimir / visão limpa). */
 function report_toolbar(string $title, string $pdfType = ''): void
 {
+    global $backUrl;
     $clean = !empty($_GET['clean']);
     $qs = $_GET;
     unset($qs['clean']);
@@ -255,6 +267,10 @@ function report_toolbar(string $title, string $pdfType = ''): void
     }
     $toggle = basename($_SERVER['SCRIPT_NAME']) . '?' . http_build_query($qs);
     echo '<div class="report-actions no-print">';
+    // Na visão limpa a barra superior some; o Voltar passa a ficar aqui
+    if ($clean) {
+        echo back_button($backUrl ?: 'reports.php');
+    }
     if ($pdfType !== '') {
         echo '<a class="btn" href="report_pdf.php?' . e($pdfQs) . '">' . icon('download', 16) . ' Baixar PDF</a>';
     }

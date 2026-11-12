@@ -98,6 +98,7 @@ if (!$case) {
 
 $pageTitle = $case['id'] ? 'Editar caso de teste' : 'Novo caso de teste';
 $active = 'cases.php';
+$backUrl = $case['id'] ? 'case_view.php?id=' . (int)$case['id'] : 'cases.php';
 include __DIR__ . '/includes/header.php';
 ?>
 <div class="card">

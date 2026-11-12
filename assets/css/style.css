@@ -86,6 +86,10 @@ code { background: var(--gray-bg); padding: 1px 5px; border-radius: 4px; font-si
 .inline-form { display: inline; margin: 0; }
 
 /* Dica ao passar o mouse (ou focar) em elementos com data-tip */
+.btn-back { gap: 6px; font-weight: 600; white-space: nowrap; }
+.topbar .btn-back { margin-right: 4px; }
+body.kb .topbar .btn-back { color: #fff; border-color: #5c121a; }
+body.kb .topbar .btn-back:hover { background: #5c121a; }
 .tip { position: relative; }
 .tip::after {
     content: attr(data-tip); position: absolute; right: 0; top: calc(100% + 8px); z-index: 20;

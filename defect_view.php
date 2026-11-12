@@ -102,6 +102,7 @@ $retestTester = $d['retest_tester_id'] ? q('SELECT name FROM users WHERE id = ?'
 
 $pageTitle = 'Chamado #' . $id;
 $active = $isDev ? 'dev_board.php' : 'defects.php';
+$backUrl = $isDev ? 'dev_board.php' : 'defects.php';
 include __DIR__ . '/includes/header.php';
 ?>
 <div class="card">

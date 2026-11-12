@@ -53,6 +53,7 @@ $cardStatus = $role === 'tester'
 
 $pageTitle = 'Execução #' . $id;
 $active = $role === 'tester' ? 'my_tests.php' : 'history.php';
+$backUrl = 'case_view.php?id=' . (int)$ex['case_id'];
 include __DIR__ . '/includes/header.php';
 ?>
 <div class="card">
@@ -74,7 +75,7 @@ include __DIR__ . '/includes/header.php';
             ? '<a href="defect_view.php?id=' . (int)$defect['id'] . '">#' . (int)$defect['id'] . ' — ' . e($defect['title']) . '</a> ' . defect_badge($defect['status'])
             : '<span class="muted">Nenhum</span>' ?></dd>
     </dl>
-    <p class="no-print"><a class="btn btn-ghost" href="report_case.php?id=<?= (int)$ex['case_id'] ?>"><?= icon('printer', 16) ?> Relatório do caso</a></p>
+    <p class="no-print"><a class="btn btn-ghost" href="report_case.php?id=<?= (int)$ex['case_id'] ?>"><?= icon('eye', 16) ?> Ver Tudo do caso</a></p>
 </div>
 
 <div class="card" id="comentarios">

@@ -44,6 +44,7 @@ $sys = get_setting('system_name', APP_NAME);
     <div class="main">
         <header class="topbar no-print">
             <button class="btn-icon menu-toggle" type="button" data-menu-toggle aria-label="Menu"><?= icon('menu', 22) ?></button>
+            <?php if (!empty($backUrl)): ?><?= back_button($backUrl, 'btn-sm') ?><?php endif; ?>
             <h1><?= e($pageTitle) ?></h1>
         </header>
         <main class="content">

@@ -113,7 +113,7 @@ A tela Meus Testes é um quadro Kanban escuro (preto/grafite com vermelho) com a
 
 ## Relatórios
 
-Relatórios: execução por projeto/período, cobertura por suíte, defeitos abertos e relatório individual do caso (com evidências).
+Relatórios: execução por projeto/período, cobertura por suíte, defeitos abertos e **Ver Tudo** de um caso (todas as execuções, evidências e defeitos dele).
 
 - **Acentuação/UTF-8**: o PDF embute uma fonte Unicode (só os glifos usados). Procura `assets/fonts/pdf-regular.ttf` e `pdf-bold.ttf`
   (opcional: coloque aqui uma fonte TrueType de sua escolha) e, na falta, usa Arial (Windows) / Liberation / DejaVu (Linux).
@@ -144,3 +144,8 @@ Para produção, use HTTPS, desative `display_errors` no `php.ini` e mantenha `u
 ## Tipo da execução
 
 Ao registrar uma execução o tester informa o **Resultado** (Aprovado, Reprovado, Bloqueado) e o **Tipo** (**Manual** ou **Automatizado**). O tipo aparece na tela da execução, no histórico, no cartão do Kanban e nos relatórios (tela e PDF).
+
+## Navegação
+
+- **Voltar (seta)**: telas de detalhe (caso, execução, chamado, Ver Tudo, relatórios, formulários) têm o botão **Voltar** na barra superior. Ele volta à página de onde você veio; se isso não fizer sentido (ex.: acabou de salvar um formulário) ou sem JavaScript, vai para a página-mãe.
+- **Ver Tudo** (no caso de teste): abre a página com todas as execuções, evidências e defeitos daquele caso, com **Baixar PDF**, **Imprimir** e **Visão limpa**. Na Visão limpa o **Voltar** aparece junto dos botões do relatório.

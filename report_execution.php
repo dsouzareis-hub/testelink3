@@ -27,6 +27,7 @@ $total = count($rows);
 
 $pageTitle = 'Relatório de Execução';
 $active = 'reports.php';
+$backUrl = 'reports.php';
 include __DIR__ . '/includes/header.php';
 ?>
 <?php report_toolbar($pageTitle . ($fProject ? ' — ' . (project_list()[$fProject] ?? '') : ''), 'execution'); ?>

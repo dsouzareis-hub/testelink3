@@ -20,6 +20,25 @@
         if (msg && !window.confirm(msg)) { ev.preventDefault(); }
     });
 
+    // Botão Voltar: usa a página anterior do histórico; se ela não serve, segue o link de reserva (href)
+    document.querySelectorAll('[data-back]').forEach(function (link) {
+        link.addEventListener('click', function (ev) {
+            try {
+                if (!document.referrer || history.length < 2) { return; }
+                var ref = new URL(document.referrer);
+                if (ref.origin !== location.origin) { return; }
+                var refPage = ref.pathname.split('/').pop();
+                var here = location.pathname.split('/').pop();
+                // Não volta para a própria página (ex.: depois de salvar um formulário) nem para telas de ação
+                var skip = ['', 'login.php', 'register.php', 'logout.php', 'execute.php', 'case_form.php', 'kanban_move.php', 'report_pdf.php'];
+                if (refPage !== here && skip.indexOf(refPage) === -1) {
+                    ev.preventDefault();
+                    history.back();
+                }
+            } catch (e) { /* usa o href de reserva */ }
+        });
+    });
+
     // Botão imprimir
     document.querySelectorAll('[data-print]').forEach(function (b) {
         b.addEventListener('click', function () { window.print(); });

@@ -24,6 +24,7 @@ foreach ($rows as $r) { $bySev[$r['severity']]++; }
 
 $pageTitle = $includeAll ? 'Relatório de Defeitos' : 'Relatório de Defeitos Abertos';
 $active = 'reports.php';
+$backUrl = 'reports.php';
 include __DIR__ . '/includes/header.php';
 ?>
 <?php report_toolbar($pageTitle, 'defects'); ?>

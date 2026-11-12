@@ -44,6 +44,7 @@ if ($editId && !$editing) { not_found(); }
 
 $pageTitle = 'Suítes de Teste';
 $active = 'suites.php';
+$backUrl = $showForm ? 'suites.php' : null;
 include __DIR__ . '/includes/header.php';
 
 if ($showForm):

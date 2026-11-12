@@ -87,6 +87,7 @@ if ($editId && !$editing) { not_found(); }
 
 $pageTitle = 'Usuários';
 $active = 'users.php';
+$backUrl = $showForm ? 'users.php' : null;
 include __DIR__ . '/includes/header.php';
 
 if ($showForm):

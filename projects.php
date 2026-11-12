@@ -38,6 +38,7 @@ if ($editId && !$editing) { not_found(); }
 
 $pageTitle = 'Projetos';
 $active = 'projects.php';
+$backUrl = $showForm ? 'projects.php' : null;
 include __DIR__ . '/includes/header.php';
 
 if ($showForm):

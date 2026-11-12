@@ -33,6 +33,7 @@ $gaps = q("SELECT tc.code, tc.title, p.name project, s.name suite, tc.priority,
 
 $pageTitle = 'Cobertura de Testes';
 $active = 'reports.php';
+$backUrl = 'reports.php';
 include __DIR__ . '/includes/header.php';
 ?>
 <?php report_toolbar($pageTitle, 'coverage'); ?>
