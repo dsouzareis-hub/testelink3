@@ -86,7 +86,7 @@ testlink/
 
 Na tela de login há o link **Solicitar cadastro**. A pessoa informa nome, e-mail, **função** (Tester, Desenvolvedor ou Usuário de leitura) e senha.
 O cadastro fica **pendente** e ela **não consegue entrar** até um administrador aprovar em **Usuários → Solicitações de cadastro pendentes**
-(o admin pode ajustar a função antes de aprovar, ou recusar). O dashboard do admin avisa quando há solicitações.
+(o admin aprova no perfil pedido, ou recusa). O dashboard do admin avisa quando há solicitações.
 A função *Administrador* não pode ser solicitada no formulário; só o admin cria outro admin.
 
 > Já instalou a versão anterior? Execute uma vez `migration_registro.sql` no banco `testlink3`.
@@ -189,3 +189,18 @@ Nas telas com anexo de imagem (executar, comentários da execução, retorno do 
 ## Kanban em tablet/celular
 
 O arrastar funciona também **com o dedo**: segure o cartão por ~0,3 s e arraste até a coluna (rolar a página continua normal).
+
+## Perfil do cadastro travado
+O perfil escolhido no **Solicitar cadastro** é o único que o administrador pode aprovar: a tela de pendentes mostra o perfil (sem seleção) e o servidor ignora qualquer `role` enviado na aprovação. Quem se cadastrou por essa tela também não tem o perfil alterado depois, na edição. Se escolheu o perfil errado, o admin **recusa** e a pessoa faz uma **nova solicitação** com o mesmo e-mail.
+
+## Modo Express (opcional, por caso)
+No cadastro do caso há os campos opcionais **Tester responsável** e **Desenvolvedor responsável** e a opção **Express**. Só o **administrador que criou o caso** liga/desliga e escolhe os responsáveis, e o Express exige os dois.
+Com Express, o chamado tramita direto, sem o admin no meio (ele continua vendo tudo em Defeitos e pode intervir):
+reprovou → dev responsável · dev concluiu → tester responsável (reteste) · reteste reprovou → dev · reteste aprovou → chamado fechado.
+Cada passo automático entra no histórico ("Fluxo Express (automático)") com quem o provocou e a data. Se faltar um responsável válido (ex.: usuário desativado), o chamado cai no fluxo convencional. Casos sem Express seguem o fluxo de sempre.
+
+## Consistência dos chamados
+- Enquanto um caso tem chamado em andamento, ele **não pode ser executado por fora**: só o reteste do tester a quem o chamado foi enviado (vinculado automaticamente).
+- Ao fechar o chamado, o cartão de reteste que ficou na fila do tester (sem atividade) vai para Concluído e os avisos pendentes são baixados. Chamado fechado não aparece como pendente em Defeitos, relatórios nem nas filas.
+
+> Atualizando de versão anterior? Execute uma vez `migration_express_perfil.sql` no banco `testlink3`.

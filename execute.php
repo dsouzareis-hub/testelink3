@@ -14,11 +14,13 @@ if ($case['status'] !== 'active') {
     redirect('my_tests.php');
 }
 
-// Reteste: defeito corrigido vinculado a este caso
-$retest = null;
-if ($defectId = get_int('defect_id')) {
-    // Reteste só vale quando o Admin enviou o chamado a ESTE tester (status "retest")
-    $retest = q("SELECT * FROM defects WHERE id = ? AND case_id = ? AND status = 'retest' AND retest_tester_id = ?", [$defectId, $caseId, $uid])->fetch() ?: null;
+// Chamado em andamento neste caso: enquanto não for fechado, ninguém executa o caso "por fora" do fluxo.
+// A única execução permitida é o reteste do tester a quem o chamado foi enviado (status "retest").
+$retest = q("SELECT * FROM defects WHERE case_id = ? AND status = 'retest' AND retest_tester_id = ? ORDER BY id LIMIT 1", [$caseId, $uid])->fetch() ?: null;
+$pending = q("SELECT id, status FROM defects WHERE case_id = ? AND status <> 'closed' AND id <> ? ORDER BY id LIMIT 1", [$caseId, $retest ? (int)$retest['id'] : 0])->fetch();
+if ($pending) {
+    flash('error', 'O caso tem o chamado #' . (int)$pending['id'] . ' em andamento (' . DEFECT_STATUS[$pending['status']] . '). Ele só pode ser executado de novo no reteste, quando o chamado for enviado a você.');
+    redirect('case_view.php?id=' . $caseId);
 }
 
 if (is_post()) {
@@ -79,7 +81,8 @@ if (is_post()) {
         // Ajusta o Kanban já com as fotos salvas: Aprovado + comentário vai direto para Concluído
         $kanbanMsg = kanban_after_execution($caseId, $uid, $result);
         flash('success', 'Execução registrada' . ($saved ? " com $saved evidência(s)" : '') . '.'
-            . ($defectNew ? " Chamado #$defectNew aberto: o Administrador fará o encaminhamento ao desenvolvedor." : '')
+            . ($defectNew ? " Chamado #$defectNew aberto: " . (defect_express_active($defectNew)
+                ? 'enviado direto ao desenvolvedor responsável (Express).' : 'o Administrador fará o encaminhamento ao desenvolvedor.') : '')
             . ($kanbanMsg ? ' ' . $kanbanMsg : ''));
         redirect('execution_view.php?id=' . $execId);
     }

@@ -6,7 +6,7 @@ $role = $user['role'];
 
 $id = get_int('id');
 // Autores: Teste = tester que reportou; Correção = dev responsável (ou o último que concluiu); Adm = quem criou o caso de teste
-$d = q('SELECT d.*, tc.code, tc.title case_title, p.name project, dev.name developer, rep.name reporter, adm.name case_author,
+$d = q('SELECT d.*, tc.code, tc.title case_title, tc.responsible_tester_id resp_tester, tc.responsible_dev_id resp_dev, p.name project, dev.name developer, rep.name reporter, adm.name case_author,
                (SELECT u2.name FROM defect_comments c JOIN users u2 ON u2.id = c.user_id
                  WHERE c.defect_id = d.id AND c.new_status = \'fixed\' ORDER BY c.id DESC LIMIT 1) fixer_name,
                (SELECT c.created_at FROM defect_comments c WHERE c.defect_id = d.id AND c.new_status = \'fixed\' ORDER BY c.id DESC LIMIT 1) fixed_at
@@ -79,7 +79,7 @@ if (is_post()) {
         foreach ($uploadErrors as $m) { flash('warn', $m); }
 
         if ($statusChanged && $newStatus === 'fixed') {
-            flash('success', 'Chamado #' . $id . ' concluído e devolvido ao Administrador. Ele fica na coluna Concluído, somente leitura.');
+            flash('success', 'Chamado #' . $id . (defect_express_active($id) ? ' concluído e enviado direto ao tester para reteste (Express).' : ' concluído e devolvido ao Administrador.') . ' Ele fica na coluna Concluído, somente leitura.');
             redirect('dev_board.php');
         }
         flash('success', $statusChanged ? 'Status atualizado para ' . DEFECT_STATUS[$newStatus] . '.' : 'Registro adicionado.');
@@ -110,7 +110,7 @@ include __DIR__ . '/includes/header.php';
     <div class="card-head">
         <h2>#<?= $id ?> · <?= e($d['title']) ?></h2>
         <div>
-            <?= defect_badge($d['status']) ?>
+            <?= $d['express'] ? badge('Express', 'red') . ' ' : '' ?><?= defect_badge($d['status']) ?>
             <?php if ($canRetest): ?>
                 <a class="btn btn-success" href="execute.php?case_id=<?= (int)$d['case_id'] ?>&defect_id=<?= $id ?>"><?= icon('play', 16) ?> Realizar reteste</a>
             <?php endif; ?>
@@ -133,6 +133,7 @@ include __DIR__ . '/includes/header.php';
             if ($d['fixer_name']): ?><strong><?= e($d['fixer_name']) ?></strong> <span class="muted">· concluiu em <?= fmt_dt($d['fixed_at']) ?></span>
             <?php elseif ($d['developer']): ?><strong><?= e($d['developer']) ?></strong> <span class="muted">· responsável, correção em andamento</span>
             <?php else: ?><span class="muted">Ainda não encaminhado ao desenvolvedor</span><?php endif; ?></dd>
+        <?php if ($d['express']): ?><dt>Fluxo</dt><dd>Express — tramita direto entre o tester e o desenvolvedor responsáveis; o admin acompanha e pode intervir.</dd><?php endif; ?>
         <dt>Autor Adm</dt><dd><?= $d['case_author'] ? '<strong>' . e($d['case_author']) . '</strong> <span class="muted">· criou o caso de teste ' . e($d['code']) . '</span>' : '<span class="muted">—</span>' ?></dd>
         <?php if ($retestTester && $d['status'] === 'retest'): ?><dt>Reteste com</dt><dd><?= e($retestTester) ?></dd><?php endif; ?>
         <dt>Relato do tester</dt><dd class="pre"><?= e($d['description']) ?></dd>
@@ -151,6 +152,7 @@ include __DIR__ . '/includes/header.php';
         <h3 style="margin:0">Tomada de decisão</h3>
         <span class="muted">Situação atual: <?= defect_badge($d['status']) ?></span>
     </div>
+    <?php if ($d['express']): ?><p class="alert alert-info">Chamado <strong>Express</strong>: tramita direto entre o tester e o desenvolvedor responsáveis. Você só decide aqui se quiser intervir (redirecionar ou fechar).</p><?php endif; ?>
     <p class="muted" style="margin-top:0">Defina a urgência e escolha <strong>um</strong> destino: o <strong>Desenvolvedor</strong> corrige e devolve o chamado a você;
         o <strong>Tester</strong> recebe o caso de volta no Kanban como <strong>Reteste</strong> (pode ser já na triagem).</p>
     <?php if (!$devs && !$testers): ?>
@@ -174,14 +176,14 @@ include __DIR__ . '/includes/header.php';
         <?php if ($devs): ?>
         <div data-target-panel="developer">
             <label class="field" style="max-width:360px">Desenvolvedor
-                <select name="developer_id"><?= options($devs, $d['assigned_to']) ?></select>
+                <select name="developer_id"><?= options($devs, $d['assigned_to'] ?: $d['resp_dev']) ?></select>
             </label>
         </div>
         <?php endif; ?>
         <?php if ($testers): ?>
         <div data-target-panel="tester">
             <label class="field" style="max-width:360px">Tester
-                <select name="tester_id"><?= options($testers, $d['retest_tester_id'] ?: $d['reported_by']) ?></select>
+                <select name="tester_id"><?= options($testers, $d['retest_tester_id'] ?: ($d['resp_tester'] ?: $d['reported_by'])) ?></select>
             </label>
         </div>
         <?php endif; ?>
@@ -197,7 +199,7 @@ include __DIR__ . '/includes/header.php';
 
 <?php if ($devReadOnly): ?>
 <div class="alert alert-info">Você concluiu este chamado. Ele está na coluna <strong>Concluído</strong> do seu Kanban, <strong>somente leitura</strong>
-    — a situação atual (<?= defect_badge($d['status']) ?>) é conduzida pelo Administrador.</div>
+    — a situação atual (<?= defect_badge($d['status']) ?>) é conduzida <?= $d['express'] ? 'pelo tester responsável (Express)' : 'pelo Administrador' ?>.</div>
 <?php endif; ?>
 <?php if ($canComment && $d['status'] !== 'closed'): ?>
 <form method="post" enctype="multipart/form-data" class="card">
@@ -207,7 +209,7 @@ include __DIR__ . '/includes/header.php';
         <?php if ($isDev): ?>
         <label class="field" style="max-width:380px">Status
             <select name="status"><?= options(DEV_STATUS_CHOICES, $d['status']) ?></select>
-            <small>Ao concluir, o chamado volta para o Administrador e fica na coluna Concluído, somente leitura (você não poderá mais alterá-lo).</small>
+            <small>Ao concluir, o chamado <?= $d['express'] ? 'segue direto ao tester para reteste (Express)' : 'volta para o Administrador' ?> e fica na coluna Concluído, somente leitura (você não poderá mais alterá-lo).</small>
         </label>
         <?php endif; ?>
         <label class="field">Comentário

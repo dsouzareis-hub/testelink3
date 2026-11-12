@@ -447,3 +447,18 @@
         });
     }
 })();
+
+/* Caso de teste: o Express só pode ser ligado com Tester e Desenvolvedor responsáveis escolhidos */
+(function () {
+    var t = document.querySelector('[data-resp-t]'), d = document.querySelector('[data-resp-d]'), x = document.querySelector('[data-express]');
+    if (!t || !d || !x || t.disabled) { return; }
+    function sync() {
+        var ok = t.value !== '' && d.value !== '';
+        x.disabled = !ok;
+        if (!ok) { x.checked = false; }
+        x.title = ok ? '' : 'Escolha o Tester e o Desenvolvedor responsáveis para ativar o Express';
+    }
+    t.addEventListener('change', sync);
+    d.addEventListener('change', sync);
+    sync();
+})();

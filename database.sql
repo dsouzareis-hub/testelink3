@@ -17,6 +17,8 @@ CREATE TABLE users (
     active        TINYINT(1) NOT NULL DEFAULT 1,
     -- Cadastro: 'pending' = solicitou acesso e aguarda o administrador; 'rejected' = recusado
     status        ENUM('approved','pending','rejected') NOT NULL DEFAULT 'approved',
+    -- 1 = a própria pessoa escolheu o perfil no cadastro; o administrador NÃO pode alterá-lo
+    self_registered TINYINT(1) NOT NULL DEFAULT 0,
     created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
@@ -60,12 +62,18 @@ CREATE TABLE test_cases (
     status          ENUM('active','inactive') NOT NULL DEFAULT 'active',
     version         INT UNSIGNED NOT NULL DEFAULT 1,
     created_by      INT UNSIGNED NULL,
+    -- Responsáveis (opcionais) e modo Express: só o admin que criou o caso define; Express exige os dois responsáveis
+    responsible_tester_id INT UNSIGNED NULL,
+    responsible_dev_id    INT UNSIGNED NULL,
+    express               TINYINT(1) NOT NULL DEFAULT 0,
     created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uq_case_code (project_id, code),
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
     FOREIGN KEY (suite_id)   REFERENCES suites(id)   ON DELETE CASCADE,
-    FOREIGN KEY (created_by) REFERENCES users(id)    ON DELETE SET NULL
+    FOREIGN KEY (created_by) REFERENCES users(id)    ON DELETE SET NULL,
+    FOREIGN KEY (responsible_tester_id) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (responsible_dev_id)    REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 CREATE TABLE test_case_versions (
@@ -156,6 +164,8 @@ CREATE TABLE defects (
     reported_by  INT UNSIGNED NOT NULL,
     assigned_to  INT UNSIGNED NULL,
     retest_tester_id INT UNSIGNED NULL,
+    -- 1 = chamado aberto em um caso Express: tramita direto entre tester e desenvolvedor, sem o admin no meio
+    express      TINYINT(1) NOT NULL DEFAULT 0,
     created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     KEY idx_defect_status (status),

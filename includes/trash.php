@@ -16,7 +16,8 @@ const TRASH_ORDER = ['projects', 'suites', 'test_cases', 'test_case_versions', '
 
 /** Colunas que apontam para usuários: true = pode virar NULL se o usuário não existir mais. */
 const TRASH_USER_COLS = [
-    'projects' => ['created_by' => true], 'test_cases' => ['created_by' => true], 'test_case_versions' => ['changed_by' => true],
+    'projects' => ['created_by' => true],
+    'test_cases' => ['created_by' => true, 'responsible_tester_id' => true, 'responsible_dev_id' => true], 'test_case_versions' => ['changed_by' => true],
     'assignments' => ['tester_id' => false, 'assigned_by' => true], 'executions' => ['tester_id' => false],
     'execution_comments' => ['user_id' => false],
     'defects' => ['reported_by' => false, 'assigned_to' => true, 'retest_tester_id' => true],

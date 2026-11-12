@@ -10,6 +10,13 @@
  *  3. O desenvolvedor trabalha (Aberto / Em andamento) e conclui → status "fixed": ele perde o acesso e o chamado
  *     volta ao Admin, que toma uma nova decisão (de novo ao dev, ou ao tester para reteste).
  *  4. Reteste do tester: aprovado → "closed"; reprovado → "reopened" (volta ao Admin para nova decisão).
+ *
+ * MODO EXPRESS (opcional, por caso; só o admin que criou o caso liga, e exige Tester e Desenvolvedor responsáveis).
+ * O chamado de um caso Express tramita direto, sem o admin no meio, e o admin continua vendo e podendo intervir:
+ *   reprovou → direto ao dev responsável (open) · dev conclui → direto ao tester responsável (retest)
+ *   · reteste reprova → direto ao dev (open) · reteste aprova → fecha (regra de encerramento de sempre).
+ * Cada passo automático é gravado no histórico, com quem o provocou e o texto "Fluxo Express (automático)".
+ * Se faltar um responsável válido na hora, o chamado cai no fluxo convencional (admin decide).
  */
 
 /** Status em que o chamado está nas mãos do desenvolvedor (visível e editável por ele). */
@@ -60,17 +67,106 @@ function create_triage_defect(int $executionId, int $testerId): int
         return (int)$existing['id'];
     }
 
-    q('INSERT INTO defects (execution_id, case_id, project_id, title, description, severity, priority, status, reported_by, assigned_to)
-       VALUES (?,?,?,?,?,?,?,?,?,NULL)', [
+    // Caso Express (com os dois responsáveis válidos): o chamado já nasce marcado como Express
+    $express = case_express_config((int)$ex['case_id']) ? 1 : 0;
+    q('INSERT INTO defects (execution_id, case_id, project_id, title, description, severity, priority, status, reported_by, assigned_to, express)
+       VALUES (?,?,?,?,?,?,?,?,?,NULL,?)', [
         $executionId, $ex['case_id'], $ex['project_id'], mb_substr('[' . $ex['code'] . '] ' . $ex['title'], 0, 200),
-        $ex['notes'] ?: 'Execução reprovada (sem observações).', $ex['priority'], 'medium', 'triage', $testerId,
+        $ex['notes'] ?: 'Execução reprovada (sem observações).', $ex['priority'], 'medium', 'triage', $testerId, $express,
     ]);
     $id = (int)db()->lastInsertId();
-    add_defect_comment($id, $testerId, 'Execução reprovada. Aguardando o Administrador encaminhar ao desenvolvedor.', null, 'triage');
-    // Quem precisa agir: o administrador (tomada de decisão)
+    add_defect_comment($id, $testerId, $express
+        ? 'Execução reprovada em caso Express.'
+        : 'Execução reprovada. Aguardando o Administrador encaminhar ao desenvolvedor.', null, 'triage');
+    if ($express && express_to_dev($id, $testerId, 'Reprovado pelo tester:')) {
+        return $id;                                           // seguiu direto ao desenvolvedor: o admin não precisa agir
+    }
+    // Fluxo convencional (ou Express sem responsável válido): quem precisa agir é o administrador
     notify_admins('Chamado #' . $id . ' (' . $ex['code'] . ') aguardando a sua decisão — reprovado no teste.',
         'defect_view.php?id=' . $id, 'decide:' . $id, $testerId);
     return $id;
+}
+
+/* ============================== MODO EXPRESS ============================== */
+
+/**
+ * Configuração Express do caso: [tester_id, dev_id, priority] se o caso é Express E os dois responsáveis estão
+ * ativos e com o perfil certo; senão null (o fluxo convencional assume).
+ */
+function case_express_config(int $caseId): ?array
+{
+    $c = q('SELECT express, responsible_tester_id t, responsible_dev_id d, priority FROM test_cases WHERE id = ?', [$caseId])->fetch();
+    if (!$c || !(int)$c['express'] || !$c['t'] || !$c['d']) {
+        return null;
+    }
+    $okT = q("SELECT 1 FROM users WHERE id = ? AND role = 'tester' AND active = 1 AND status = 'approved'", [$c['t']])->fetchColumn();
+    $okD = q("SELECT 1 FROM users WHERE id = ? AND role = 'developer' AND active = 1 AND status = 'approved'", [$c['d']])->fetchColumn();
+    return ($okT && $okD) ? ['tester_id' => (int)$c['t'], 'dev_id' => (int)$c['d'], 'priority' => $c['priority']] : null;
+}
+
+/** Este chamado tramita em Express agora? (marcado como Express na abertura E o caso ainda tem responsáveis válidos) */
+function defect_express_active(int $defectId): bool
+{
+    $d = q('SELECT case_id, express FROM defects WHERE id = ?', [$defectId])->fetch();
+    return $d && (int)$d['express'] === 1 && case_express_config((int)$d['case_id']) !== null;
+}
+
+/** Express: encaminha direto ao desenvolvedor responsável (status "open"). */
+function express_to_dev(int $defectId, int $actorId, string $reason): bool
+{
+    $d = q('SELECT d.status, d.case_id, tc.code FROM defects d JOIN test_cases tc ON tc.id = d.case_id WHERE d.id = ?', [$defectId])->fetch();
+    $cfg = $d ? case_express_config((int)$d['case_id']) : null;
+    if (!$cfg || $d['status'] === 'closed') {
+        return false;
+    }
+    $devName = (string)q('SELECT name FROM users WHERE id = ?', [$cfg['dev_id']])->fetchColumn();
+    q("UPDATE defects SET assigned_to = ?, retest_tester_id = NULL, priority = ?, status = 'open' WHERE id = ?", [$cfg['dev_id'], $cfg['priority'], $defectId]);
+    add_defect_comment($defectId, $actorId, 'Fluxo Express (automático): ' . $reason . ' encaminhado direto ao desenvolvedor ' . $devName
+        . ' — urgência ' . LEVELS[$cfg['priority']] . '.', $d['status'], 'open');
+    notify_resolve('decide:' . $defectId);
+    notify_resolve('retest:' . $defectId);
+    notify($cfg['dev_id'], 'Chamado #' . $defectId . ' (' . $d['code'] . ') encaminhado a você (Express) — urgência ' . LEVELS[$cfg['priority']] . '.',
+        'defect_view.php?id=' . $defectId, 'dev:' . $defectId);
+    audit('chamado_express', 'defect', $defectId, 'Direto ao desenvolvedor ' . $devName . ' — ' . $reason, $actorId);
+    return true;
+}
+
+/** Express: envia direto ao tester responsável para reteste (status "retest") e põe o caso no Kanban dele. */
+function express_to_tester(int $defectId, int $actorId, string $reason): bool
+{
+    $d = q('SELECT d.status, d.case_id, tc.code FROM defects d JOIN test_cases tc ON tc.id = d.case_id WHERE d.id = ?', [$defectId])->fetch();
+    $cfg = $d ? case_express_config((int)$d['case_id']) : null;
+    if (!$cfg || $d['status'] === 'closed') {
+        return false;
+    }
+    $tName = (string)q('SELECT name FROM users WHERE id = ?', [$cfg['tester_id']])->fetchColumn();
+    q("UPDATE defects SET retest_tester_id = ?, status = 'retest' WHERE id = ?", [$cfg['tester_id'], $defectId]);
+    // O tester responsável precisa ter o caso atribuído; o cartão entra direto em Em Andamento (novo ciclo)
+    q('INSERT IGNORE INTO assignments (case_id, tester_id, assigned_by) VALUES (?,?,NULL)', [$d['case_id'], $cfg['tester_id']]);
+    q("UPDATE assignments SET kanban_status = 'doing', cycle_start = NOW(), done_at = NULL WHERE case_id = ? AND tester_id = ?", [$d['case_id'], $cfg['tester_id']]);
+    add_defect_comment($defectId, $actorId, 'Fluxo Express (automático): ' . $reason . ' enviado direto ao tester ' . $tName . ' para reteste.', $d['status'], 'retest');
+    notify_resolve('dev:' . $defectId);
+    notify_resolve('decide:' . $defectId);
+    notify($cfg['tester_id'], 'Reteste solicitado (Express): caso ' . $d['code'] . ' (chamado #' . $defectId . ').',
+        'case_view.php?id=' . (int)$d['case_id'], 'retest:' . $defectId);
+    audit('chamado_express', 'defect', $defectId, 'Direto ao tester ' . $tName . ' para reteste — ' . $reason, $actorId);
+    return true;
+}
+
+/**
+ * Chamado fechado: o cartão de reteste que ficou na fila do tester sem nenhuma atividade (ex.: o admin fechou por fora)
+ * deixa de ser pendência e vai para Concluído. Quem já executou algo mantém o cartão como está.
+ */
+function release_retest_card(int $defectId): void
+{
+    $d = q('SELECT case_id, retest_tester_id FROM defects WHERE id = ?', [$defectId])->fetch();
+    if (!$d || !$d['retest_tester_id']) {
+        return;
+    }
+    q("UPDATE assignments a SET a.kanban_status = 'done', a.done_at = NOW()
+       WHERE a.case_id = ? AND a.tester_id = ? AND a.kanban_status IN ('waiting','doing')
+         AND NOT EXISTS (SELECT 1 FROM executions e WHERE e.case_id = a.case_id AND e.tester_id = a.tester_id AND e.executed_at >= a.cycle_start)",
+        [$d['case_id'], $d['retest_tester_id']]);
 }
 
 /** Testers ativos atribuídos ao caso (id => nome): são os que podem receber o reteste. */
@@ -155,7 +251,16 @@ function set_defect_status(int $defectId, string $new, int $userId, ?string $com
         q('UPDATE defects SET status = ? WHERE id = ?', [$new, $defectId]);
         defect_status_notifications($defectId, $new, $userId);
     }
-    return add_defect_comment($defectId, $userId, $comment, $old !== $new ? $old : null, $old !== $new ? $new : null);
+    // Primeiro grava a ação de quem a fez; só depois o passo automático do Express (histórico na ordem certa)
+    $recordId = add_defect_comment($defectId, $userId, $comment, $old !== $new ? $old : null, $old !== $new ? $new : null);
+    if ($old !== $new && defect_express_active($defectId)) {
+        if ($new === 'fixed') {
+            express_to_tester($defectId, $userId, 'Correção concluída pelo desenvolvedor:');
+        } elseif ($new === 'reopened') {
+            express_to_dev($defectId, $userId, 'Reteste reprovado:');
+        }
+    }
+    return $recordId;
 }
 
 /**
@@ -167,17 +272,24 @@ function defect_status_notifications(int $defectId, string $new, int $actorId): 
 {
     $code = (string)q('SELECT tc.code FROM defects d JOIN test_cases tc ON tc.id = d.case_id WHERE d.id = ?', [$defectId])->fetchColumn();
     $link = 'defect_view.php?id=' . $defectId;
+    // Em Express o chamado segue direto (o próximo responsável é avisado pelo passo automático): o admin não precisa agir
+    $express = defect_express_active($defectId);
     switch ($new) {
         case 'fixed':
             notify_resolve('dev:' . $defectId);
-            notify_admins('Chamado #' . $defectId . ' (' . $code . ') concluído pelo desenvolvedor — aguardando a sua decisão.', $link, 'decide:' . $defectId, $actorId);
+            if (!$express) {
+                notify_admins('Chamado #' . $defectId . ' (' . $code . ') concluído pelo desenvolvedor — aguardando a sua decisão.', $link, 'decide:' . $defectId, $actorId);
+            }
             break;
         case 'reopened':
             notify_resolve('retest:' . $defectId);
-            notify_admins('Chamado #' . $defectId . ' (' . $code . ') reaberto no reteste — aguardando a sua decisão.', $link, 'decide:' . $defectId, $actorId);
+            if (!$express) {
+                notify_admins('Chamado #' . $defectId . ' (' . $code . ') reaberto no reteste — aguardando a sua decisão.', $link, 'decide:' . $defectId, $actorId);
+            }
             break;
         case 'closed':
             foreach (['decide:', 'dev:', 'retest:'] as $p) { notify_resolve($p . $defectId); }
+            release_retest_card($defectId);          // não deixa o reteste "pendurado" na fila do tester
             break;
     }
 }

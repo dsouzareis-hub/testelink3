@@ -31,13 +31,22 @@ if (is_post()) {
         $error = 'A senha deve ter ao menos 8 caracteres.';
     } elseif ($pass !== $confirm) {
         $error = 'A confirmação não confere com a senha.';
-    } elseif (q('SELECT 1 FROM users WHERE email = ?', [$email])->fetchColumn()) {
-        $error = 'Já existe um cadastro com este e-mail.';
+    } elseif (($existing = q('SELECT id, status FROM users WHERE email = ?', [$email])->fetch()) && $existing['status'] !== 'rejected') {
+        $error = $existing['status'] === 'pending'
+            ? 'Já existe uma solicitação pendente para este e-mail. Aguarde a análise do administrador.'
+            : 'Já existe um cadastro com este e-mail.';
     } else {
-        // Fica inativo e pendente até o administrador aprovar
-        q('INSERT INTO users (name, email, password_hash, role, active, status) VALUES (?,?,?,?,0,?)',
-            [$name, $email, password_hash($pass, PASSWORD_DEFAULT), $role, 'pending']);
-        $newId = (int)db()->lastInsertId();
+        // Fica inativo e pendente até o administrador aprovar. O perfil escolhido AQUI é o único que o admin pode aprovar.
+        // Se a solicitação anterior foi recusada (ex.: perfil errado), esta é uma NOVA solicitação com o mesmo e-mail.
+        if ($existing) {
+            q("UPDATE users SET name = ?, password_hash = ?, role = ?, active = 0, status = 'pending', self_registered = 1 WHERE id = ?",
+                [$name, password_hash($pass, PASSWORD_DEFAULT), $role, $existing['id']]);
+            $newId = (int)$existing['id'];
+        } else {
+            q('INSERT INTO users (name, email, password_hash, role, active, status, self_registered) VALUES (?,?,?,?,0,?,1)',
+                [$name, $email, password_hash($pass, PASSWORD_DEFAULT), $role, 'pending']);
+            $newId = (int)db()->lastInsertId();
+        }
         // Só o administrador precisa agir: é ele quem aprova
         notify_admins('Nova solicitação de cadastro: ' . $name . ' (' . ROLES[$role] . ')', 'users.php', 'user:' . $newId);
         audit('cadastro_solicitado', 'user', $newId, $name . ' <' . $email . '> — ' . ROLES[$role], null, $name);

@@ -37,8 +37,9 @@ function dev_move(int $defectId, string $to, int $devId): array
         return ['ok' => true, 'message' => '', 'status' => $to];
     }
     if ($to === 'fixed') {
-        set_defect_status($defectId, 'fixed', $devId, 'Concluído pelo desenvolvedor; chamado devolvido ao Administrador.');
-        return ['ok' => true, 'message' => 'Chamado #' . $defectId . ' concluído e devolvido ao Administrador. Ele fica em Concluído, somente leitura.', 'status' => 'fixed', 'locked' => true];
+        $express = defect_express_active($defectId);
+        set_defect_status($defectId, 'fixed', $devId, $express ? 'Concluído pelo desenvolvedor.' : 'Concluído pelo desenvolvedor; chamado devolvido ao Administrador.');
+        return ['ok' => true, 'message' => 'Chamado #' . $defectId . ($express ? ' concluído e enviado direto ao tester para reteste (Express).' : ' concluído e devolvido ao Administrador.') . ' Ele fica em Concluído, somente leitura.', 'status' => 'fixed', 'locked' => true];
     }
     set_defect_status($defectId, $to, $devId);
     return ['ok' => true, 'message' => 'Movido para ' . DEV_COLUMNS[$to] . '.', 'status' => $to];

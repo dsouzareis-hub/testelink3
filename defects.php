@@ -38,7 +38,7 @@ if ($fStatus === 'open_all') {
     $where[] = "d.status <> 'closed'";
 }
 
-$rows = q('SELECT d.id, d.title, d.severity, d.priority, d.status, d.updated_at, tc.code, p.name project,
+$rows = q('SELECT d.id, d.title, d.express, d.severity, d.priority, d.status, d.updated_at, tc.code, p.name project,
                   dev.name developer, rep.name reporter
            FROM defects d JOIN test_cases tc ON tc.id = d.case_id JOIN projects p ON p.id = d.project_id
            LEFT JOIN users dev ON dev.id = d.assigned_to JOIN users rep ON rep.id = d.reported_by
@@ -93,7 +93,7 @@ include __DIR__ . '/includes/header.php';
         <?php foreach ($rows as $d): ?>
             <tr>
                 <td><a href="defect_view.php?id=<?= (int)$d['id'] ?>"><?= (int)$d['id'] ?></a></td>
-                <td><a href="defect_view.php?id=<?= (int)$d['id'] ?>"><?= e($d['title']) ?></a><br><small class="muted"><?= e($d['project']) ?> · por <?= e($d['reporter']) ?></small></td>
+                <td><a href="defect_view.php?id=<?= (int)$d['id'] ?>"><?= e($d['title']) ?></a><?= $d['express'] ? ' ' . badge('Express', 'red') : '' ?><br><small class="muted"><?= e($d['project']) ?> · por <?= e($d['reporter']) ?></small></td>
                 <td><?= e($d['code']) ?></td>
                 <td><?= level_badge($d['severity']) ?></td>
                 <td><?= level_badge($d['priority']) ?></td>

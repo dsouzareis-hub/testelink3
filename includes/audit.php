@@ -32,5 +32,6 @@ const AUDIT_ACTIONS = [
     'lixeira_restaurar' => 'Restaurado da lixeira', 'lixeira_excluir' => 'Excluído definitivamente', 'lixeira_esvaziar' => 'Lixeira esvaziada',
     'atribuicao' => 'Casos atribuídos', 'atribuicao_removida' => 'Atribuição removida',
     'chamado_decisao' => 'Decisão em chamado', 'chamado_fechado' => 'Chamado fechado',
+    'chamado_express' => 'Fluxo Express (automático)', 'caso_express' => 'Modo Express do caso',
     'backup_criado' => 'Backup criado', 'backup_excluido' => 'Backup excluído',
 ];

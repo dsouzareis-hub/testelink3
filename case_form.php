@@ -10,6 +10,11 @@ $projects = project_list();
 $suites = q('SELECT id, project_id, name FROM suites ORDER BY name')->fetchAll();
 $suiteById = array_column($suites, null, 'id');
 
+$allTesters = users_by_role('tester');
+$allDevs = users_by_role('developer');
+// Modo Express: só o administrador que criou o caso pode ligar/desligar e escolher os responsáveis
+$canExpress = !$case || $case['created_by'] === null || (int)$case['created_by'] === (int)$me['id'];
+
 if (is_post()) {
     csrf_check();
     $suiteId = post_int('suite_id');
@@ -25,7 +30,25 @@ if (is_post()) {
     $note = post('change_note');
     $err = null;
 
-    if (!isset($suiteById[$suiteId])) {
+    // Responsáveis e Express: valores enviados só valem para o admin criador; os demais mantêm o que está gravado
+    $respT = $case['responsible_tester_id'] ?? null;
+    $respD = $case['responsible_dev_id'] ?? null;
+    $express = (int)($case['express'] ?? 0);
+    if ($canExpress) {
+        $respT = post_int('responsible_tester_id') ?: null;
+        $respD = post_int('responsible_dev_id') ?: null;
+        $express = post('express') === '1' ? 1 : 0;
+        // só aceita quem já é o responsável gravado ou um usuário ativo do perfil certo
+        if ($respT && !isset($allTesters[$respT]) && $respT !== (int)($case['responsible_tester_id'] ?? 0)) { $err = 'Tester responsável inválido.'; }
+        if ($respD && !isset($allDevs[$respD]) && $respD !== (int)($case['responsible_dev_id'] ?? 0)) { $err = 'Desenvolvedor responsável inválido.'; }
+        if (!$err && $express && (!$respT || !$respD)) {
+            $err = 'O modo Express exige o Tester responsável e o Desenvolvedor responsável.';
+        }
+    }
+
+    if ($err) {
+        // já definido acima
+    } elseif (!isset($suiteById[$suiteId])) {
         $err = 'Selecione uma suíte.';
     } elseif ($data['code'] === '' || $data['title'] === '' || $data['steps'] === '' || $data['expected_result'] === '') {
         $err = 'Código, título, passos e resultado esperado são obrigatórios.';
@@ -39,7 +62,8 @@ if (is_post()) {
 
     if ($err) {
         flash('error', $err);
-        $case = array_merge($case ?: ['id' => 0, 'version' => 1], $data, ['suite_id' => $suiteId, 'project_id' => $projectId]);
+        $case = array_merge($case ?: ['id' => 0, 'version' => 1], $data, ['suite_id' => $suiteId, 'project_id' => $projectId,
+            'responsible_tester_id' => $respT, 'responsible_dev_id' => $respD, 'express' => $express]);
     } else {
         $pdo = db();
         $pdo->beginTransaction();
@@ -52,19 +76,20 @@ if (is_post()) {
                 }
                 $version = (int)$case['version'] + ($changed ? 1 : 0);
                 q('UPDATE test_cases SET project_id=?, suite_id=?, code=?, title=?, preconditions=?, steps=?, expected_result=?,
-                   priority=?, status=?, version=? WHERE id=?', [
+                   priority=?, status=?, version=?, responsible_tester_id=?, responsible_dev_id=?, express=? WHERE id=?', [
                     $projectId, $suiteId, $data['code'], $data['title'], $data['preconditions'], $data['steps'],
-                    $data['expected_result'], $data['priority'], $data['status'], $version, $id,
+                    $data['expected_result'], $data['priority'], $data['status'], $version, $respT, $respD, $express, $id,
                 ]);
                 $caseId = $id;
             } else {
                 $version = 1;
                 $changed = true;
                 $note = $note ?: 'Criação do caso';
-                q('INSERT INTO test_cases (project_id, suite_id, code, title, preconditions, steps, expected_result, priority, status, created_by)
-                   VALUES (?,?,?,?,?,?,?,?,?,?)', [
+                q('INSERT INTO test_cases (project_id, suite_id, code, title, preconditions, steps, expected_result, priority, status, created_by,
+                   responsible_tester_id, responsible_dev_id, express)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)', [
                     $projectId, $suiteId, $data['code'], $data['title'], $data['preconditions'], $data['steps'],
-                    $data['expected_result'], $data['priority'], $data['status'], $me['id'],
+                    $data['expected_result'], $data['priority'], $data['status'], $me['id'], $respT, $respD, $express,
                 ]);
                 $caseId = (int)$pdo->lastInsertId();
             }
@@ -77,9 +102,14 @@ if (is_post()) {
             }
             $pdo->commit();
             audit($id ? 'caso_editado' : 'caso_criado', 'case', $caseId, $data['code'] . ' — ' . $data['title'] . ' (v' . $version . ')');
+            if ($express !== (int)($case['express'] ?? 0)) {
+                audit('caso_express', 'case', $caseId, $data['code'] . ($express ? ' — Express ATIVADO' : ' — Express desativado'));
+            }
             flash('success', $id ? 'Caso de teste atualizado.' : 'Caso de teste criado.');
             // Atribuição aos testers marcados (avisa quem recebeu; não remove quem já executou)
-            $as = sync_case_testers($caseId, (array)($_POST['testers'] ?? []), (int)$me['id']);
+            $picked = (array)($_POST['testers'] ?? []);
+            if ($express && $respT) { $picked[] = $respT; }       // o tester responsável sempre recebe o caso
+            $as = sync_case_testers($caseId, $picked, (int)$me['id']);
             if ($as['added']) { flash('success', 'Atribuído a: ' . implode(', ', $as['added']) . '.'); }
             if ($as['removed']) { flash('success', 'Atribuição removida de: ' . implode(', ', $as['removed']) . '.'); }
             if ($as['kept']) { flash('warn', implode(', ', $as['kept']) . ' já executou este caso e continua atribuído (para não esconder o histórico).'); }
@@ -102,8 +132,7 @@ if (!$case) {
     ];
 }
 
-// Testers ativos e quais estão marcados (após erro de validação mantém a marcação enviada)
-$allTesters = users_by_role('tester');
+// Quais testers estão marcados (após erro de validação mantém a marcação enviada)
 $selTesters = is_post()
     ? array_map('intval', (array)($_POST['testers'] ?? []))
     : ($case['id'] ? array_map('intval', q('SELECT tester_id FROM assignments WHERE case_id = ?', [$case['id']])->fetchAll(PDO::FETCH_COLUMN)) : []);
@@ -148,6 +177,24 @@ include __DIR__ . '/includes/header.php';
                 </div>
                 <?php if ($case['id']): ?><small>Desmarcar remove o tester do caso, exceto se ele já executou (aí continua atribuído, para não esconder o histórico).</small><?php endif; ?>
                 <?php endif; ?>
+            </div>
+            <label class="field">Tester responsável <small>(opcional)</small>
+                <select name="responsible_tester_id" data-resp-t <?= $canExpress ? '' : 'disabled' ?>>
+                    <?= options($allTesters, $case['responsible_tester_id'] ?? null, true, 'Nenhum') ?>
+                </select>
+            </label>
+            <label class="field">Desenvolvedor responsável <small>(opcional)</small>
+                <select name="responsible_dev_id" data-resp-d <?= $canExpress ? '' : 'disabled' ?>>
+                    <?= options($allDevs, $case['responsible_dev_id'] ?? null, true, 'Nenhum') ?>
+                </select>
+            </label>
+            <div class="field">
+                <span>Fluxo Express</span>
+                <label class="check pick"><input type="checkbox" name="express" value="1" data-express <?= !empty($case['express']) ? 'checked' : '' ?> <?= $canExpress ? '' : 'disabled' ?>> Ativar Express</label>
+                <small>
+                    <?php if ($canExpress): ?>Tester e Desenvolvedor tratam o chamado direto, sem passar pela decisão do admin (você continua vendo tudo). Exige os dois responsáveis.
+                    <?php else: ?>Somente o administrador que criou o caso pode alterar o Express e os responsáveis.<?php endif; ?>
+                </small>
             </div>
             <div class="field span-2">
                 <span>Passos de execução <small>— digite o passo e aperte <strong>Enter</strong> para criar o próximo; cada passo vira um tópico</small></span>

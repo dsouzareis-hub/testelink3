@@ -16,6 +16,17 @@ if (is_post()) {
         $password = $_POST['password'] ?? '';
         $err = null;
 
+        // Perfil escolhido pela PRÓPRIA pessoa no cadastro não pode ser alterado pelo administrador;
+        // solicitações pendentes/recusadas só podem ser aprovadas ou recusadas (nunca editadas).
+        $current = $id ? q('SELECT role, status, self_registered FROM users WHERE id = ?', [$id])->fetch() : null;
+        if ($current && $current['status'] !== 'approved') {
+            flash('error', 'Esta solicitação de cadastro ainda não foi aprovada: use Aprovar ou Recusar.');
+            redirect('users.php');
+        }
+        if ($current && (int)$current['self_registered'] === 1) {
+            $role = $current['role'];
+        }
+
         if ($name === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $err = 'Informe nome e um e-mail válido.';
         } elseif (!isset(ROLES[$role])) {
@@ -48,17 +59,16 @@ if (is_post()) {
             flash('success', 'Usuário criado.');
         }
     } elseif ($action === 'approve' && $id) {
-        // Aprova a solicitação; o administrador pode ajustar a função antes de liberar
-        $role = post('role');
-        if (!isset(ROLES[$role])) {
-            flash('error', 'Função inválida.');
+        // Aprova a solicitação COM O PERFIL QUE A PESSOA ESCOLHEU (guardado no banco). O admin não escolhe nem altera:
+        // qualquer "role" enviado no formulário é ignorado. Perfil errado = recusar e pedir uma nova solicitação.
+        $req = q("SELECT role FROM users WHERE id = ? AND status = 'pending'", [$id])->fetch();
+        if (!$req) {
+            flash('error', 'Solicitação não encontrada.');
         } else {
-            $n = q("UPDATE users SET status = 'approved', active = 1, role = ? WHERE id = ? AND status = 'pending'", [$role, $id])->rowCount();
-            if ($n) {
-                notify_resolve('user:' . $id);                      // a ação foi feita: baixa o aviso de todos os admins
-                audit('cadastro_aprovado', 'user', $id, 'Função: ' . ROLES[$role]);
-            }
-            flash($n ? 'success' : 'error', $n ? 'Cadastro aprovado. O usuário já pode entrar.' : 'Solicitação não encontrada.');
+            q("UPDATE users SET status = 'approved', active = 1 WHERE id = ? AND status = 'pending'", [$id]);
+            notify_resolve('user:' . $id);                          // a ação foi feita: baixa o aviso de todos os admins
+            audit('cadastro_aprovado', 'user', $id, 'Perfil solicitado pelo usuário: ' . ROLES[$req['role']]);
+            flash('success', 'Cadastro aprovado como ' . ROLES[$req['role']] . ' (perfil escolhido pelo usuário). Ele já pode entrar.');
         }
     } elseif ($action === 'reject' && $id) {
         $n = q("UPDATE users SET status = 'rejected', active = 0 WHERE id = ? AND status = 'pending'", [$id])->rowCount();
@@ -66,7 +76,7 @@ if (is_post()) {
             notify_resolve('user:' . $id);
             audit('cadastro_recusado', 'user', $id);
         }
-        flash($n ? 'success' : 'error', $n ? 'Solicitação recusada.' : 'Solicitação não encontrada.');
+        flash($n ? 'success' : 'error', $n ? 'Solicitação recusada. Se o perfil estava errado, peça para a pessoa fazer uma nova solicitação de cadastro com o e-mail dela.' : 'Solicitação não encontrada.');
     } elseif ($action === 'toggle' && $id && $id !== (int)$me['id']) {
         q("UPDATE users SET active = 1 - active WHERE id = ? AND status = 'approved'", [$id]);
         audit('usuario_status', 'user', $id);
@@ -96,6 +106,10 @@ $editId = get_int('edit');
 $showForm = isset($_GET['new']) || $editId;
 $editing = $editId ? q('SELECT * FROM users WHERE id = ?', [$editId])->fetch() : null;
 if ($editId && !$editing) { not_found(); }
+if ($editing && $editing['status'] !== 'approved') {
+    flash('error', 'Solicitações de cadastro só podem ser aprovadas ou recusadas, não editadas.');
+    redirect('users.php');
+}
 
 $pageTitle = 'Usuários';
 $active = 'users.php';
@@ -114,7 +128,11 @@ if ($showForm):
         <div class="grid grid-2">
             <label class="field">Nome <input type="text" name="name" required maxlength="120" value="<?= e($u['name']) ?>"></label>
             <label class="field">E-mail <input type="email" name="email" required maxlength="160" value="<?= e($u['email']) ?>"></label>
-            <label class="field">Perfil <select name="role"><?= options(ROLES, $u['role']) ?></select></label>
+            <?php $roleLocked = $editing && !empty($u['self_registered']); ?>
+            <label class="field">Perfil
+                <select name="role" <?= $roleLocked ? 'disabled' : '' ?>><?= options(ROLES, $u['role']) ?></select>
+                <?php if ($roleLocked): ?><small>Perfil escolhido pelo próprio usuário no cadastro — não pode ser alterado. Se precisar de outro perfil, ele deve fazer um novo cadastro.</small><?php endif; ?>
+            </label>
             <label class="field"><?= $editing ? 'Nova senha' : 'Senha inicial' ?>
                 <input type="password" name="password" minlength="8" autocomplete="new-password" <?= $editing ? '' : 'required' ?>>
                 <?php if ($editing): ?><small>Deixe em branco para manter a atual.</small><?php endif; ?>
@@ -134,17 +152,19 @@ if ($showForm):
 <?php if ($pending): ?>
 <div class="card" style="border-color:#fcd34d">
     <h2>Solicitações de cadastro pendentes (<?= count($pending) ?>)</h2>
+    <p class="muted" style="margin-top:0">O perfil é o que a <strong>própria pessoa escolheu</strong> no cadastro e <strong>não pode ser alterado</strong> pelo administrador.
+        Se estiver errado, <strong>recuse</strong>: ela faz uma nova solicitação com o perfil correto.</p>
     <div class="table-wrap"><table>
-        <thead><tr><th>Nome</th><th>E-mail</th><th>Função solicitada</th><th>Solicitado em</th><th></th></tr></thead>
+        <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil solicitado</th><th>Solicitado em</th><th></th></tr></thead>
         <tbody>
         <?php foreach ($pending as $p): ?>
             <tr>
                 <td><?= e($p['name']) ?></td>
                 <td><?= e($p['email']) ?></td>
                 <td>
+                    <?= badge(ROLES[$p['role']], 'blue') ?>
                     <form method="post" class="inline-form" id="ap-<?= (int)$p['id'] ?>">
                         <?= csrf_field() ?><input type="hidden" name="action" value="approve"><input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
-                        <select name="role" aria-label="Função"><?= options(ROLES, $p['role']) ?></select>
                     </form>
                 </td>
                 <td><?= fmt_dt($p['created_at']) ?></td>
@@ -174,7 +194,7 @@ if ($showForm):
                 <td><?= $u['status'] === 'rejected' ? badge('Recusado', 'red') : ($u['active'] ? badge('Ativo', 'green') : badge('Inativo', 'gray')) ?></td>
                 <td><?= fmt_date($u['created_at']) ?></td>
                 <td class="actions">
-                    <a class="btn btn-sm btn-ghost" href="users.php?edit=<?= (int)$u['id'] ?>"><?= icon('edit', 14) ?> Editar</a>
+                    <?php if ($u['status'] === 'approved'): ?><a class="btn btn-sm btn-ghost" href="users.php?edit=<?= (int)$u['id'] ?>"><?= icon('edit', 14) ?> Editar</a><?php endif; ?>
                     <?php if ((int)$u['id'] !== (int)$me['id']): ?>
                     <?php if ($u['status'] === 'approved'): ?>
                     <form method="post" class="inline-form">
